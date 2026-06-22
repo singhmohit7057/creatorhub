@@ -1,13 +1,13 @@
 import { useState, useEffect, useRef } from 'react'
 import { Helmet } from 'react-helmet-async'
 import toast from 'react-hot-toast'
-import { CheckCircle2, Monitor, ExternalLink } from 'lucide-react'
+import { CheckCircle2, Monitor } from 'lucide-react'
 import { useAuth } from '@/contexts/AuthContext'
 import { profileService } from '@/services/profileService'
 import { PORTFOLIO_TEMPLATES } from '@/utils/constants'
 import { Button } from '@/components/common/Button'
 import { cn } from '@/utils/helpers'
-import { APP_URL } from '@/utils/constants'
+
 import type { PortfolioTemplate } from '@/types'
 
 function TemplateThumbnail({ value }: { value: string }) {
@@ -142,7 +142,7 @@ export function TemplatePage() {
   const active   = (profile?.template as PortfolioTemplate) ?? 'minimal'
   const username = profile?.username ?? 'democreator'
   const previewUrl = `/${username}?tpl=${selected}&preview=1`
-  const portfolioUrl = `${APP_URL}/${username}?tpl=${selected}`
+
 
   return (
     <>
