@@ -27,6 +27,7 @@ interface AdminStats {
   active_this_week: number
   unread_inquiries: number
   pending_verifications: number
+  approved_verifications: number
 }
 
 export function AdminDashboard() {
@@ -40,16 +41,18 @@ export function AdminDashboard() {
     const weekAgo = new Date(Date.now() - 7 * 86400_000).toISOString()
 
     Promise.all([
-      supabase.from('profiles').select('*', { count: 'exact', head: true }),
-      supabase.from('profiles').select('*', { count: 'exact', head: true }).eq('is_published', true),
+      supabase.from('profiles').select('*', { count: 'exact', head: true }).neq('role', 'admin'),
+      supabase.from('profiles').select('*', { count: 'exact', head: true }).neq('role', 'admin').eq('is_published', true),
       supabase.from('analytics_events').select('*', { count: 'exact', head: true }).eq('event_type', 'portfolio_view'),
       supabase.from('media_files').select('*', { count: 'exact', head: true }),
-      supabase.from('profiles').select('*', { count: 'exact', head: true }).gte('created_at', today),
-      supabase.from('profiles').select('*', { count: 'exact', head: true }).gte('created_at', weekAgo),
-      supabase.from('profiles').select('*', { count: 'exact', head: true }).gte('updated_at', weekAgo).eq('status', 'active'),
+      supabase.from('profiles').select('*', { count: 'exact', head: true }).neq('role', 'admin').gte('created_at', today),
+      supabase.from('profiles').select('*', { count: 'exact', head: true }).neq('role', 'admin').gte('created_at', weekAgo),
+      supabase.from('profiles').select('*', { count: 'exact', head: true }).neq('role', 'admin').gte('updated_at', weekAgo).eq('status', 'active'),
       supabase.from('contact_inquiries').select('*', { count: 'exact', head: true }).eq('is_read', false),
-      supabase.from('profiles').select('*').order('created_at', { ascending: false }).limit(5),
-      supabase.from('profiles').select('*').eq('is_featured', true).limit(12),
+      supabase.from('profiles').select('*').neq('role', 'admin').order('created_at', { ascending: false }).limit(5),
+      supabase.from('profiles').select('*').neq('role', 'admin').eq('is_featured', true).limit(12),
+      supabase.from('verification_requests').select('*', { count: 'exact', head: true }).eq('status', 'pending'),
+      supabase.from('verification_requests').select('*', { count: 'exact', head: true }).eq('status', 'approved'),
     ]).then(([
       { count: total_users },
       { count: total_portfolios },
@@ -61,17 +64,20 @@ export function AdminDashboard() {
       { count: unread_inquiries },
       { data: profiles },
       { data: featuredProfiles },
+      { count: pending_verifications },
+      { count: approved_verifications },
     ]) => {
       setStats({
-        total_users:          total_users          ?? 0,
-        total_portfolios:     total_portfolios     ?? 0,
-        total_views:          total_views          ?? 0,
-        total_media_uploads:  total_media_uploads  ?? 0,
-        new_users_today:      new_users_today      ?? 0,
-        new_users_week:       new_users_week       ?? 0,
-        active_this_week:     active_this_week     ?? 0,
-        unread_inquiries:     unread_inquiries     ?? 0,
-        pending_verifications: 0,
+        total_users:           total_users           ?? 0,
+        total_portfolios:      total_portfolios      ?? 0,
+        total_views:           total_views           ?? 0,
+        total_media_uploads:   total_media_uploads   ?? 0,
+        new_users_today:       new_users_today       ?? 0,
+        new_users_week:        new_users_week        ?? 0,
+        active_this_week:      active_this_week      ?? 0,
+        unread_inquiries:      unread_inquiries      ?? 0,
+        pending_verifications: pending_verifications ?? 0,
+        approved_verifications: approved_verifications ?? 0,
       })
       setRecent((profiles as Profile[]) ?? [])
       setFeatured((featuredProfiles as Profile[]) ?? [])
@@ -89,7 +95,7 @@ export function AdminDashboard() {
   return (
     <>
       <Helmet><title>Overview — Admin</title></Helmet>
-      <div className="p-6 max-w-6xl mx-auto space-y-6">
+      <div className="p-4 sm:p-6 max-w-6xl mx-auto space-y-4 sm:space-y-6">
 
         {/* Header */}
         <div>
@@ -114,7 +120,25 @@ export function AdminDashboard() {
               <StatCard title="Signups Today"          value={stats.new_users_today}          icon={<UserPlus   className="w-5 h-5" />} />
               <StatCard title="Active Creators"        value={stats.active_this_week}         icon={<Activity   className="w-5 h-5" />} />
               <StatCard title="Unread Inquiries"       value={stats.unread_inquiries}         icon={<MailOpen   className="w-5 h-5" />} />
-              <StatCard title="Pending Verifications"  value={stats.pending_verifications}    icon={<BadgeCheck className="w-5 h-5" />} />
+              <div className="bg-white rounded-2xl border border-surface-200 p-4 space-y-2">
+                <div className="flex items-center justify-between">
+                  <p className="text-xs font-medium text-surface-500">Verifications</p>
+                  <div className="w-8 h-8 rounded-xl bg-brand-50 flex items-center justify-center">
+                    <BadgeCheck className="w-4 h-4 text-brand-500" />
+                  </div>
+                </div>
+                <div className="flex items-end gap-3">
+                  <div>
+                    <p className="text-2xl font-black text-surface-900">{stats.pending_verifications}</p>
+                    <p className="text-[11px] text-amber-600 font-medium mt-0.5">Pending</p>
+                  </div>
+                  <div className="w-px h-8 bg-surface-100" />
+                  <div>
+                    <p className="text-2xl font-black text-surface-900">{stats.approved_verifications}</p>
+                    <p className="text-[11px] text-emerald-600 font-medium mt-0.5">Approved</p>
+                  </div>
+                </div>
+              </div>
             </div>
           </>
         )}
@@ -135,23 +159,20 @@ export function AdminDashboard() {
             ) : (
               <div className="space-y-1">
                 {recent.map(c => (
-                  <div key={c.id} className="flex items-center justify-between px-3 py-2.5 rounded-xl hover:bg-surface-50 transition-colors">
+                  <div key={c.id} className="flex items-center justify-between px-3 py-2.5 rounded-xl hover:bg-surface-50 transition-colors gap-2">
                     <div className="flex items-center gap-3 min-w-0">
                       <Avatar src={c.avatar_url} name={c.full_name} size="sm" />
                       <div className="min-w-0">
                         <p className="text-sm font-medium text-surface-900 truncate">{c.full_name}</p>
-                        <p className="text-xs text-surface-400 truncate">@{c.username} · {c.city}</p>
+                        <p className="text-xs text-surface-400 truncate">@{c.username}{c.city ? ` · ${c.city}` : ''}</p>
                       </div>
                     </div>
-                    <div className="flex items-center gap-2 shrink-0 ml-2">
-                      {c.category && (
-                        <span className="text-[10px] font-medium text-surface-500 capitalize hidden sm:block">{c.category}</span>
-                      )}
+                    <div className="flex items-center gap-2 shrink-0">
                       {c.is_published
                         ? <Badge variant="success">Live</Badge>
                         : <Badge variant="default">Draft</Badge>
                       }
-                      <span className="text-xs text-surface-400 hidden md:block">{timeAgo(c.created_at)}</span>
+                      <span className="text-xs text-surface-400 hidden sm:block">{timeAgo(c.created_at)}</span>
                     </div>
                   </div>
                 ))}

@@ -209,7 +209,7 @@ export function CollaborationsPage() {
 
   async function onSubmitCollab(data: CollabForm) {
     if (!profile || !user) return
-    const collaboration_date = dateYear && dateMonth ? `${dateYear}-${dateMonth}` : null
+    const collaboration_date = dateYear && dateMonth ? `${dateYear}-${dateMonth}-01` : null
     try {
       if (editing) {
         const updated = await collaborationService.update(editing.id, {

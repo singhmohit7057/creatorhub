@@ -48,7 +48,7 @@ export const socialService = {
   async saveAll(profileId: string, links: { platform: SocialPlatform; url: string }[]) {
     await supabase.from('social_links').delete().eq('profile_id', profileId)
     if (!links.length) return []
-    const rows = links.map((l, i) => ({ profile_id: profileId, platform: l.platform, url: l.url, display_order: i }))
+    const rows = links.map(l => ({ profile_id: profileId, platform: l.platform, url: l.url }))
     const { data, error } = await supabase.from('social_links').insert(rows).select()
     if (error) throw error
     return data as SocialLink[]

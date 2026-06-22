@@ -43,9 +43,9 @@ export function AdminAnalytics() {
 
   useEffect(() => {
     Promise.all([
-      supabase.from('profiles').select('*').order('created_at', { ascending: false }).limit(500),
-      supabase.from('profiles').select('*', { count: 'exact', head: true }),
-      supabase.from('profiles').select('created_at').order('created_at', { ascending: true }),
+      supabase.from('profiles').select('*').neq('role', 'admin').order('created_at', { ascending: false }).limit(500),
+      supabase.from('profiles').select('*', { count: 'exact', head: true }).neq('role', 'admin'),
+      supabase.from('profiles').select('created_at').neq('role', 'admin').order('created_at', { ascending: true }),
     ]).then(([{ data: profiles }, { count }, { data: signups }]) => {
       setCreators((profiles as Profile[]) ?? [])
       setTotalUsers(count ?? 0)
@@ -106,7 +106,7 @@ export function AdminAnalytics() {
   return (
     <>
       <Helmet><title>Analytics — Admin</title></Helmet>
-      <div className="p-6 max-w-5xl mx-auto space-y-6">
+      <div className="p-4 sm:p-6 max-w-5xl mx-auto space-y-4 sm:space-y-6">
 
         {/* Header + range selector */}
         <div className="flex items-start justify-between gap-4 flex-wrap">

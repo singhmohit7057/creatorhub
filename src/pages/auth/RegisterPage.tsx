@@ -1,13 +1,14 @@
 import { useState } from 'react'
-import { Link, useNavigate } from 'react-router-dom'
+import { Link } from 'react-router-dom'
+
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
 import { Helmet } from 'react-helmet-async'
-import { Sparkles, Mail, Lock, User } from 'lucide-react'
+import { Sparkles, Mail, User, CheckCircle2 } from 'lucide-react'
 import toast from 'react-hot-toast'
 import { supabase } from '@/lib/supabase'
-import { Input } from '@/components/common/Input'
+import { Input, PasswordInput } from '@/components/common/Input'
 import { Button } from '@/components/common/Button'
 
 const schema = z.object({
@@ -19,8 +20,8 @@ const schema = z.object({
 type FormData = z.infer<typeof schema>
 
 export function RegisterPage() {
-  const navigate = useNavigate()
   const [googleLoading, setGoogleLoading] = useState(false)
+  const [done, setDone] = useState<string | null>(null)
 
   const { register, handleSubmit, formState: { errors, isSubmitting } } = useForm<FormData>({
     resolver: zodResolver(schema),
@@ -33,8 +34,7 @@ export function RegisterPage() {
       options:  { data: { full_name: data.full_name } },
     })
     if (error) { toast.error(error.message); return }
-    toast.success('Account created! Welcome to Showkase.')
-    navigate('/dashboard')
+    setDone(data.email)
   }
 
   async function signUpWithGoogle() {
@@ -46,23 +46,48 @@ export function RegisterPage() {
     if (error) { toast.error(error.message); setGoogleLoading(false) }
   }
 
+  if (done) return (
+    <>
+      <Helmet><title>Check your email — Showkase</title></Helmet>
+      <div className="min-h-screen bg-surface-50 flex items-center justify-center px-4">
+        <div className="w-full max-w-md bg-white rounded-2xl border border-surface-200 shadow-card p-8 text-center">
+          <div className="w-14 h-14 rounded-2xl bg-emerald-50 flex items-center justify-center mx-auto mb-4">
+            <CheckCircle2 className="w-7 h-7 text-emerald-500" />
+          </div>
+          <h1 className="text-xl font-bold text-surface-900 mb-2">Check your email</h1>
+          <p className="text-surface-500 text-sm leading-relaxed">
+            We sent a confirmation link to<br />
+            <span className="font-semibold text-surface-700">{done}</span>
+          </p>
+          <p className="text-surface-400 text-xs mt-4">
+            Click the link in the email to activate your account and get started.
+          </p>
+          <p className="text-surface-400 text-xs mt-6">
+            Already confirmed?{' '}
+            <Link to="/login" className="text-brand-600 font-medium hover:text-brand-700">Sign in</Link>
+          </p>
+        </div>
+      </div>
+    </>
+  )
+
   return (
     <>
       <Helmet>
         <title>Create Account — Showkase</title>
       </Helmet>
-      <div className="min-h-screen bg-surface-50 flex items-center justify-center px-4 py-12">
+      <div className="min-h-screen bg-surface-50 flex items-center justify-center px-4 py-4">
         <div className="w-full max-w-md">
-          <div className="bg-white rounded-2xl border border-surface-200 shadow-card p-8">
-            <div className="text-center mb-8">
-              <Link to="/" className="inline-flex items-center gap-2 font-bold text-xl text-surface-900 mb-6">
-                <div className="w-9 h-9 rounded-xl bg-gradient-brand flex items-center justify-center">
-                  <Sparkles className="w-5 h-5 text-white" />
+          <div className="bg-white rounded-2xl border border-surface-200 shadow-card p-6">
+            <div className="text-center mb-5">
+              <Link to="/" className="inline-flex items-center gap-2 font-bold text-xl text-surface-900 mb-4">
+                <div className="w-8 h-8 rounded-xl bg-gradient-brand flex items-center justify-center">
+                  <Sparkles className="w-4 h-4 text-white" />
                 </div>
                 Showkase
               </Link>
-              <h1 className="text-2xl font-bold text-surface-900">Create your portfolio</h1>
-              <p className="text-surface-500 text-sm mt-1">Free forever · No credit card required</p>
+              <h1 className="text-xl font-bold text-surface-900">Create your portfolio</h1>
+              <p className="text-surface-500 text-sm mt-0.5">Free forever · No credit card required</p>
             </div>
 
             <Button
@@ -83,13 +108,13 @@ export function RegisterPage() {
               Continue with Google
             </Button>
 
-            <div className="flex items-center gap-3 my-6">
+            <div className="flex items-center gap-3 my-4">
               <div className="flex-1 h-px bg-surface-200" />
               <span className="text-xs text-surface-400 font-medium">OR</span>
               <div className="flex-1 h-px bg-surface-200" />
             </div>
 
-            <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
+            <form onSubmit={handleSubmit(onSubmit)} className="space-y-3">
               <Input
                 label="Full Name"
                 type="text"
@@ -106,19 +131,15 @@ export function RegisterPage() {
                 error={errors.email?.message}
                 {...register('email')}
               />
-              <Input
+              <PasswordInput
                 label="Password"
-                type="password"
                 placeholder="Min. 8 characters"
-                leftIcon={<Lock className="w-4 h-4" />}
                 error={errors.password?.message}
                 {...register('password')}
               />
-              <Input
+              <PasswordInput
                 label="Confirm Password"
-                type="password"
                 placeholder="Repeat password"
-                leftIcon={<Lock className="w-4 h-4" />}
                 error={errors.confirm?.message}
                 {...register('confirm')}
               />
@@ -128,13 +149,13 @@ export function RegisterPage() {
               </Button>
             </form>
 
-            <p className="text-center text-xs text-surface-400 mt-4">
+            <p className="text-center text-xs text-surface-400 mt-3">
               By creating an account you agree to our{' '}
               <Link to="/terms" className="text-brand-600 hover:underline">Terms</Link> &{' '}
               <Link to="/privacy" className="text-brand-600 hover:underline">Privacy Policy</Link>
             </p>
 
-            <p className="text-center text-sm text-surface-500 mt-4">
+            <p className="text-center text-sm text-surface-500 mt-3">
               Already have an account?{' '}
               <Link to="/login" className="text-brand-600 font-medium hover:text-brand-700">Sign in</Link>
             </p>

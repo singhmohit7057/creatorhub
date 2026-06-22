@@ -6,13 +6,27 @@ const EDGE_FN = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/track-event`
 
 async function track(payload: Record<string, unknown>) {
   try {
-    await fetch(EDGE_FN, {
+    const res = await fetch(EDGE_FN, {
       method:  'POST',
       headers: { 'Content-Type': 'application/json' },
       body:    JSON.stringify(payload),
     })
+    if (res.ok) return
+    throw new Error(`edge fn ${res.status}`)
   } catch {
-    // silently fail — never break the user experience for analytics
+    // Edge function unavailable (local dev) — insert directly
+    try {
+      await supabase.from('analytics_events').insert({
+        profile_id: payload.profile_id,
+        event_type: payload.event_type,
+        visitor_id: payload.visitor_id ?? null,
+        referrer:   payload.referrer   ?? null,
+        platform:   payload.platform   ?? null,
+        country:    null,
+      })
+    } catch {
+      // silently fail — never break the user experience for analytics
+    }
   }
 }
 

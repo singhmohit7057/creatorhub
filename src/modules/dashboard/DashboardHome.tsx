@@ -139,7 +139,7 @@ export function DashboardHome() {
             <>
               <StatTile icon={<Eye className="w-4 h-4" />} label="Portfolio Views"  value={formatNumber(analytics?.total_views ?? 0)} color="brand" />
               <StatTile icon={<Users className="w-4 h-4" />} label="Followers"      value={formatNumber(stats?.followers ?? 0)}        color="violet" />
-              <StatTile icon={<TrendingUp className="w-4 h-4" />} label="Engagement" value={stats ? `${stats.engagement_rate}%` : '—'}  color="emerald" />
+              <StatTile icon={<TrendingUp className="w-4 h-4" />} label="Engagement" value={stats?.engagement_rate != null ? `${stats.engagement_rate}%` : '—'}  color="emerald" />
               <StatTile icon={<Briefcase className="w-4 h-4" />} label="Brand Collabs" value={collabs.length}                          color="rose" />
             </>
           )}

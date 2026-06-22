@@ -1,12 +1,13 @@
 import { useState, useEffect, useRef } from 'react'
 import { Helmet } from 'react-helmet-async'
 import toast from 'react-hot-toast'
-import { CheckCircle2, Monitor } from 'lucide-react'
+import { CheckCircle2, Monitor, ExternalLink } from 'lucide-react'
 import { useAuth } from '@/contexts/AuthContext'
 import { profileService } from '@/services/profileService'
 import { PORTFOLIO_TEMPLATES } from '@/utils/constants'
 import { Button } from '@/components/common/Button'
 import { cn } from '@/utils/helpers'
+import { APP_URL } from '@/utils/constants'
 import type { PortfolioTemplate } from '@/types'
 
 function TemplateThumbnail({ value }: { value: string }) {
@@ -140,7 +141,8 @@ export function TemplatePage() {
 
   const active   = (profile?.template as PortfolioTemplate) ?? 'minimal'
   const username = profile?.username ?? 'democreator'
-  const previewUrl = `/${username}?tpl=${selected}`
+  const previewUrl = `/${username}?tpl=${selected}&preview=1`
+  const portfolioUrl = `${APP_URL}/${username}?tpl=${selected}`
 
   return (
     <>
@@ -148,18 +150,100 @@ export function TemplatePage() {
       <div className="h-[calc(100vh-56px)] flex flex-col">
 
         {/* Header */}
-        <div className="px-6 py-4 border-b border-surface-200 bg-white flex items-center justify-between shrink-0">
+        <div className="px-4 sm:px-6 py-3 sm:py-4 border-b border-surface-200 bg-white flex items-center justify-between gap-3 shrink-0">
           <div>
-            <h1 className="text-xl font-bold text-surface-900">Template</h1>
-            <p className="text-surface-500 text-sm mt-0.5">Choose how your public portfolio looks to brands</p>
+            <h1 className="text-lg sm:text-xl font-bold text-surface-900">Template</h1>
+            <p className="text-surface-500 text-xs sm:text-sm mt-0.5 hidden sm:block">Choose how your public portfolio looks to brands</p>
           </div>
-          <Button onClick={applyTemplate} loading={saving} disabled={selected === active}>
+          <Button onClick={applyTemplate} loading={saving} disabled={selected === active} size="sm">
             {selected === active ? 'Applied' : 'Apply Template'}
           </Button>
         </div>
 
-        {/* Two-panel body */}
-        <div className="flex-1 flex overflow-hidden">
+        {/* Mobile: horizontal template strip + live preview below */}
+        <div className="flex-1 flex flex-col overflow-hidden lg:hidden">
+
+          {/* Horizontal scrollable template picker */}
+          <div className="shrink-0 bg-white border-b border-surface-200">
+            <div
+              className="flex gap-2.5 overflow-x-auto px-4 py-3 snap-x snap-mandatory"
+              style={{ scrollbarWidth: 'none' }}
+            >
+              {PORTFOLIO_TEMPLATES.map(tpl => {
+                const isActive   = active === tpl.value
+                const isSelected = selected === tpl.value
+                return (
+                  <button
+                    key={tpl.value}
+                    onClick={() => setSelected(tpl.value)}
+                    className={cn(
+                      'shrink-0 w-32 rounded-xl border-2 overflow-hidden text-left transition-all relative snap-start',
+                      isSelected ? 'border-brand-500 shadow-sm' : 'border-surface-200',
+                    )}
+                  >
+                    {isActive && (
+                      <div className="absolute top-1.5 right-1.5 z-10">
+                        <CheckCircle2 className="w-4 h-4 text-brand-500 drop-shadow-sm fill-white" />
+                      </div>
+                    )}
+                    <TemplateThumbnail value={tpl.value} />
+                    <div className="p-2 bg-white">
+                      <p className="text-xs font-semibold text-surface-900">{tpl.label}</p>
+                      {isActive && (
+                        <span className="inline-block mt-0.5 text-[9px] font-bold px-1.5 py-0.5 rounded-full bg-brand-50 text-brand-600 border border-brand-200">
+                          Active
+                        </span>
+                      )}
+                    </div>
+                  </button>
+                )
+              })}
+            </div>
+          </div>
+
+          {/* Live iframe preview */}
+          <div className="flex-1 overflow-hidden bg-surface-100 flex flex-col">
+            <div className="px-3 py-2 border-b border-surface-200 bg-white flex items-center gap-2 shrink-0">
+              <Monitor className="w-3.5 h-3.5 text-surface-400" />
+              <span className="text-xs text-surface-500 font-medium">
+                Preview — {PORTFOLIO_TEMPLATES.find(t => t.value === selected)?.label}
+              </span>
+            </div>
+            <div className="flex-1 overflow-y-auto flex items-start justify-center p-3">
+              <div
+                className="relative rounded-xl overflow-hidden shadow-xl border border-surface-300 bg-white"
+                ref={el => {
+                  if (!el) return
+                  const pad = 24
+                  const parentW = el.parentElement?.offsetWidth ?? 375
+                  const availW  = parentW - pad
+                  const scale   = Math.min(availW / 390, 1)
+                  el.style.width  = `${390 * scale}px`
+                  el.style.height = `${2400 * scale}px`
+                  const iframe = el.querySelector('iframe') as HTMLIFrameElement | null
+                  if (iframe) iframe.style.transform = `scale(${scale})`
+                }}
+              >
+                <iframe
+                  key={previewUrl}
+                  src={previewUrl}
+                  title="Portfolio preview mobile"
+                  className="border-0"
+                  style={{
+                    width:           '390px',
+                    height:          '2400px',
+                    transformOrigin: 'top left',
+                    transform:       'scale(0.5)',
+                  }}
+                />
+              </div>
+            </div>
+          </div>
+
+        </div>
+
+        {/* Desktop: two-panel layout */}
+        <div className="hidden lg:flex flex-1 overflow-hidden">
 
           {/* Left — template list */}
           <div className="w-64 shrink-0 border-r border-surface-200 bg-white overflow-y-auto p-4 space-y-3">
@@ -203,18 +287,17 @@ export function TemplatePage() {
                 Preview — {PORTFOLIO_TEMPLATES.find(t => t.value === selected)?.label}
               </span>
             </div>
-            <div className="flex-1 overflow-hidden flex items-start justify-center p-6">
-              {/* Wrapper sized to scaled iframe — no gaps */}
+            <div className="flex-1 overflow-y-auto flex items-start justify-center p-6">
               <div
                 className="relative rounded-2xl overflow-hidden shadow-2xl border border-surface-300 bg-white"
                 ref={el => {
                   if (!el) return
-                  const pad = 48 // 2 * p-6 (24px each)
+                  const pad = 48
                   const parentH = el.parentElement?.offsetHeight ?? 700
                   const availH  = parentH - pad
                   const scale   = Math.min(availH / 844, 1)
                   el.style.width  = `${390 * scale}px`
-                  el.style.height = `${844 * scale}px`
+                  el.style.height = `${2400 * scale}px`
                   const iframe = el.querySelector('iframe') as HTMLIFrameElement | null
                   if (iframe) iframe.style.transform = `scale(${scale})`
                 }}
@@ -227,7 +310,7 @@ export function TemplatePage() {
                   className="border-0"
                   style={{
                     width:           '390px',
-                    height:          '844px',
+                    height:          '2400px',
                     transformOrigin: 'top left',
                     transform:       'scale(0.5)',
                   }}

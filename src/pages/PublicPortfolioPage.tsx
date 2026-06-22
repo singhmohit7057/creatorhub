@@ -34,14 +34,16 @@ export function PublicPortfolioPage() {
   const [loading,      setLoading]      = useState(true)
   const [notFound,     setNotFound]     = useState(false)
 
+  const isPreview = searchParams.get('preview') === '1'
+
   useEffect(() => {
     if (!username) return
     ;(async () => {
       try {
         const p = await profileService.getByUsername(username)
-        if (!p.is_published) { setNotFound(true); return }
+        if (!p.is_published && !isPreview) { setNotFound(true); return }
         setProfile(p)
-        analyticsService.trackView(p.id)
+        if (!isPreview) analyticsService.trackView(p.id)
         const [s, m, st, c, t, sv] = await Promise.all([
           socialService.getByProfile(p.id),
           mediaService.getByProfile(p.id),

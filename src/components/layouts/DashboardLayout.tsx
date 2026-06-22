@@ -1,8 +1,9 @@
-import { useState, useEffect } from 'react'
-import { Link, useLocation, Outlet } from 'react-router-dom'
+import { useState, useEffect, useRef } from 'react'
+import { Link, useLocation, Outlet, useNavigate } from 'react-router-dom'
 import {
   LayoutDashboard, Image, Briefcase, Star,
   BarChart2, Settings, Sparkles, Menu, Bell, ExternalLink, Mail, Palette, FileText,
+  LogOut, User,
 } from 'lucide-react'
 import { useAuth } from '@/contexts/AuthContext'
 import { inquiryService } from '@/services/inquiryService'
@@ -22,10 +23,23 @@ const navItems = [
 ]
 
 export function DashboardLayout() {
-  const { profile } = useAuth()
+  const { profile, signOut } = useAuth()
   const location = useLocation()
+  const navigate = useNavigate()
   const [sidebarOpen, setSidebarOpen] = useState(false)
   const [unreadCount, setUnreadCount] = useState(0)
+  const [dropdownOpen, setDropdownOpen] = useState(false)
+  const dropdownRef = useRef<HTMLDivElement>(null)
+
+  useEffect(() => {
+    function handleClickOutside(e: MouseEvent) {
+      if (dropdownRef.current && !dropdownRef.current.contains(e.target as Node)) {
+        setDropdownOpen(false)
+      }
+    }
+    document.addEventListener('mousedown', handleClickOutside)
+    return () => document.removeEventListener('mousedown', handleClickOutside)
+  }, [])
 
   useEffect(() => {
     if (!profile) return
@@ -53,7 +67,7 @@ export function DashboardLayout() {
       <nav className="flex-1 px-3 py-4 space-y-1 overflow-y-auto">
         {navItems.map(item => {
           const active = location.pathname === item.href ||
-            (item.href !== '/dashboard' && location.pathname.startsWith(item.href))
+            (item.href !== '/dashboard' && location.pathname.startsWith(item.href + '/'))
           const isInquiries = item.href === '/dashboard/inquiries'
           return (
             <Link
@@ -146,7 +160,42 @@ export function DashboardLayout() {
                   <span className="absolute top-1 right-1 w-2 h-2 rounded-full bg-brand-500" />
                 )}
               </Link>
-              <Avatar src={profile.avatar_url} name={profile.full_name} size="sm" />
+              <div className="relative" ref={dropdownRef}>
+                <button onClick={() => setDropdownOpen(p => !p)}>
+                  <Avatar src={profile.avatar_url} name={profile.full_name} size="sm" className="cursor-pointer hover:ring-2 hover:ring-brand-400 hover:ring-offset-1 transition-all" />
+                </button>
+                {dropdownOpen && (
+                  <div className="absolute right-0 top-10 w-52 bg-white rounded-xl border border-surface-200 shadow-lg py-1 z-50">
+                    <div className="px-3 py-2.5 border-b border-surface-100">
+                      <p className="text-sm font-semibold text-surface-900 truncate">{profile.full_name}</p>
+                      <p className="text-xs text-surface-400 truncate">@{profile.username}</p>
+                    </div>
+                    <Link
+                      to="/dashboard/settings"
+                      onClick={() => setDropdownOpen(false)}
+                      className="flex items-center gap-2.5 px-3 py-2 text-sm text-surface-700 hover:bg-surface-50 transition-colors"
+                    >
+                      <User className="w-4 h-4 text-surface-400" /> Profile & Settings
+                    </Link>
+                    <a
+                      href={`/${profile.username}`}
+                      target="_blank"
+                      rel="noreferrer"
+                      onClick={() => setDropdownOpen(false)}
+                      className="flex items-center gap-2.5 px-3 py-2 text-sm text-surface-700 hover:bg-surface-50 transition-colors"
+                    >
+                      <ExternalLink className="w-4 h-4 text-surface-400" /> View Portfolio
+                    </a>
+                    <div className="border-t border-surface-100 mt-1" />
+                    <button
+                      onClick={async () => { setDropdownOpen(false); await signOut(); navigate('/login') }}
+                      className="flex items-center gap-2.5 px-3 py-2 text-sm text-red-600 hover:bg-red-50 transition-colors w-full"
+                    >
+                      <LogOut className="w-4 h-4" /> Sign out
+                    </button>
+                  </div>
+                )}
+              </div>
             </>
           )}
         </header>

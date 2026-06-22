@@ -50,6 +50,7 @@ export interface Profile {
   template: PortfolioTemplate
   is_published: boolean
   is_featured: boolean
+  username_claimed: boolean
   created_at: string
   updated_at: string
 }

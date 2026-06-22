@@ -37,7 +37,7 @@ export const mediaService = {
         url:         urlData.publicUrl,
         mime_type:   file.type,
         size_bytes:  file.size,
-        sort_order:  Date.now(),
+        sort_order:  Math.floor(Date.now() / 1000),
       })
       .select()
       .single()

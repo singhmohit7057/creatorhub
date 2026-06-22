@@ -17,27 +17,31 @@ export function AdminContent() {
   const [sort, setSort]       = useState<SortKey>('media')
 
   useEffect(() => {
-    supabase
-      .from('profiles')
-      .select(`
-        *,
-        media_files(count),
-        brand_collaborations(count),
-        testimonials(count),
-        analytics_events(count)
-      `)
-      .order('created_at', { ascending: false })
-      .then(({ data }) => {
-        const mapped = ((data ?? []) as any[]).map(row => ({
-          ...row,
-          media_count:       row.media_files?.[0]?.count          ?? 0,
-          collab_count:      row.brand_collaborations?.[0]?.count  ?? 0,
-          testimonial_count: row.testimonials?.[0]?.count          ?? 0,
-          total_views:       row.analytics_events?.[0]?.count      ?? 0,
-        })) as ContentRow[]
-        setRows(mapped)
-        setLoading(false)
-      })
+    Promise.all([
+      supabase
+        .from('profiles')
+        .select('*, media_files(count), brand_collaborations(count), testimonials(count)')
+        .neq('role', 'admin')
+        .order('created_at', { ascending: false }),
+      supabase
+        .from('analytics_events')
+        .select('profile_id')
+        .eq('event_type', 'portfolio_view'),
+    ]).then(([{ data: profiles }, { data: events }]) => {
+      const viewMap: Record<string, number> = {}
+      for (const e of (events ?? [])) {
+        viewMap[e.profile_id] = (viewMap[e.profile_id] ?? 0) + 1
+      }
+      const mapped = ((profiles ?? []) as any[]).map(row => ({
+        ...row,
+        media_count:       row.media_files?.[0]?.count         ?? 0,
+        collab_count:      row.brand_collaborations?.[0]?.count ?? 0,
+        testimonial_count: row.testimonials?.[0]?.count         ?? 0,
+        total_views:       viewMap[row.id]                      ?? 0,
+      })) as ContentRow[]
+      setRows(mapped)
+      setLoading(false)
+    })
   }, [])
 
   const sorted = [...rows].sort((a, b) =>
@@ -64,7 +68,7 @@ export function AdminContent() {
   return (
     <>
       <Helmet><title>Content — Admin</title></Helmet>
-      <div className="p-6 space-y-4">
+      <div className="p-4 sm:p-6 space-y-4">
 
         {/* Header */}
         <div>
@@ -104,8 +108,8 @@ export function AdminContent() {
           ))}
         </div>
 
-        {/* Table */}
-        <div className="bg-white rounded-2xl border border-surface-200 overflow-hidden">
+        {/* Table — desktop */}
+        <div className="bg-white rounded-2xl border border-surface-200 overflow-hidden hidden md:block">
           {loading ? (
             <div className="p-4 space-y-3">
               {[1,2,3,4,5].map(i => <Skeleton key={i} className="h-14 rounded-xl" />)}
@@ -144,35 +148,21 @@ export function AdminContent() {
                       </div>
                     </td>
                     <td className="px-4 py-3 text-center">
-                      <span className={cn('text-sm font-semibold', sort === 'views' ? 'text-brand-600' : 'text-surface-700')}>
-                        {formatNumber(row.total_views)}
-                      </span>
+                      <span className={cn('text-sm font-semibold', sort === 'views' ? 'text-brand-600' : 'text-surface-700')}>{formatNumber(row.total_views)}</span>
                     </td>
                     <td className="px-4 py-3 text-center">
-                      <span className={cn('text-sm font-semibold', sort === 'media' ? 'text-brand-600' : 'text-surface-700')}>
-                        {row.media_count}
-                      </span>
+                      <span className={cn('text-sm font-semibold', sort === 'media' ? 'text-brand-600' : 'text-surface-700')}>{row.media_count}</span>
                     </td>
                     <td className="px-4 py-3 text-center">
-                      <span className={cn('text-sm font-semibold', sort === 'collabs' ? 'text-brand-600' : 'text-surface-700')}>
-                        {row.collab_count}
-                      </span>
+                      <span className={cn('text-sm font-semibold', sort === 'collabs' ? 'text-brand-600' : 'text-surface-700')}>{row.collab_count}</span>
                     </td>
                     <td className="px-4 py-3 text-center">
-                      <span className={cn('text-sm font-semibold', sort === 'testimonials' ? 'text-brand-600' : 'text-surface-700')}>
-                        {row.testimonial_count}
-                      </span>
+                      <span className={cn('text-sm font-semibold', sort === 'testimonials' ? 'text-brand-600' : 'text-surface-700')}>{row.testimonial_count}</span>
                     </td>
-                    <td className="px-4 py-3 text-xs text-surface-400 hidden lg:table-cell">
-                      {timeAgo(row.updated_at)}
-                    </td>
+                    <td className="px-4 py-3 text-xs text-surface-400 hidden lg:table-cell">{timeAgo(row.updated_at)}</td>
                     <td className="px-4 py-3 text-right">
-                      <a
-                        href={`/${row.username}`}
-                        target="_blank"
-                        rel="noreferrer"
-                        className="inline-flex items-center gap-1 text-xs text-brand-600 hover:underline font-medium"
-                      >
+                      <a href={`/${row.username}`} target="_blank" rel="noreferrer"
+                        className="inline-flex items-center gap-1 text-xs text-brand-600 hover:underline font-medium">
                         <ExternalLink className="w-3.5 h-3.5" />
                       </a>
                     </td>
@@ -181,6 +171,31 @@ export function AdminContent() {
               </tbody>
             </table>
           )}
+        </div>
+
+        {/* Cards — mobile */}
+        <div className="md:hidden space-y-2">
+          {loading
+            ? [1,2,3,4,5].map(i => <Skeleton key={i} className="h-20 rounded-xl" />)
+            : sorted.map(row => (
+              <div key={row.id} className="bg-white rounded-2xl border border-surface-200 px-4 py-3 flex items-center gap-3">
+                <Avatar src={row.avatar_url} name={row.full_name} size="sm" />
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm font-medium text-surface-900 truncate">{row.full_name || '(no name)'}</p>
+                  <p className="text-xs text-surface-400">@{row.username}</p>
+                  <div className="flex gap-3 mt-1 text-[11px] text-surface-500">
+                    <span>{formatNumber(row.total_views)} views</span>
+                    <span>{row.media_count} media</span>
+                    <span>{row.collab_count} collabs</span>
+                  </div>
+                </div>
+                <a href={`/${row.username}`} target="_blank" rel="noreferrer"
+                  className="shrink-0 p-2 rounded-lg text-brand-600 hover:bg-brand-50 transition-colors">
+                  <ExternalLink className="w-4 h-4" />
+                </a>
+              </div>
+            ))
+          }
         </div>
       </div>
     </>

@@ -30,16 +30,25 @@ export function AdminVerification() {
   const [expanded, setExpanded] = useState<string | null>(null)
 
   useEffect(() => {
-    // Load from verification_requests table when it exists
-    // For now, load profiles that have requested verification
     supabase
-      .from('profiles')
-      .select('id, full_name, username, avatar_url, category, is_verified')
-      .eq('status', 'active')
-      .order('created_at', { ascending: false })
+      .from('verification_requests')
+      .select('id, profile_id, reason, status, requested_at, profiles(full_name, username, avatar_url, category)')
+      .order('requested_at', { ascending: false })
       .limit(100)
-      .then(() => {
-        setRequests([])
+      .then(({ data }) => {
+        const rows: VerifRequest[] = (data ?? []).map((r: any) => ({
+          id: r.id,
+          profile_id: r.profile_id,
+          full_name: r.profiles?.full_name ?? '',
+          username: r.profiles?.username ?? '',
+          avatar_url: r.profiles?.avatar_url ?? null,
+          category: r.profiles?.category ?? null,
+          followers: 0,
+          reason: r.reason ?? '',
+          requested_at: r.requested_at,
+          status: r.status,
+        }))
+        setRequests(rows)
         setLoading(false)
       })
   }, [])
@@ -54,13 +63,21 @@ export function AdminVerification() {
   }
 
   async function approve(r: VerifRequest) {
-    const { error } = await supabase.from('profiles').update({ is_verified: true }).eq('id', r.profile_id)
-    if (error) { toast.error(error.message); return }
+    const [{ error: e1 }, { error: e2 }] = await Promise.all([
+      supabase.from('profiles').update({ is_verified: true }).eq('id', r.profile_id),
+      supabase.from('verification_requests').update({ status: 'approved', reviewed_at: new Date().toISOString() }).eq('id', r.id),
+    ])
+    if (e1 || e2) { toast.error((e1 || e2)!.message); return }
     setRequests(prev => prev.map(x => x.id === r.id ? { ...x, status: 'approved' } : x))
     toast.success(`${r.full_name} verified!`)
   }
 
   async function reject(r: VerifRequest) {
+    const [{ error: e1 }, { error: e2 }] = await Promise.all([
+      supabase.from('profiles').update({ is_verified: false }).eq('id', r.profile_id),
+      supabase.from('verification_requests').update({ status: 'rejected', reviewed_at: new Date().toISOString() }).eq('id', r.id),
+    ])
+    if (e1 || e2) { toast.error((e1 || e2)!.message); return }
     setRequests(prev => prev.map(x => x.id === r.id ? { ...x, status: 'rejected' } : x))
     toast.success('Request rejected')
   }

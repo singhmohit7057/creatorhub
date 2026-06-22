@@ -22,6 +22,7 @@ export function AdminCreators() {
     supabase
       .from('profiles')
       .select('*')
+      .neq('role', 'admin')
       .order('created_at', { ascending: false })
       .limit(200)
       .then(({ data }) => { setCreators((data as Profile[]) ?? []); setLoading(false) })
@@ -91,15 +92,15 @@ export function AdminCreators() {
   return (
     <>
       <Helmet><title>Creators — Admin</title></Helmet>
-      <div className="p-6 space-y-4">
+      <div className="p-4 sm:p-6 space-y-4">
 
         {/* Header + Search */}
-        <div className="flex items-center justify-between gap-4">
-          <div>
+        <div className="flex flex-col sm:flex-row sm:items-center gap-3">
+          <div className="flex-1">
             <h1 className="text-xl font-bold text-surface-900">Creators</h1>
             <p className="text-sm text-surface-500 mt-0.5">Manage all creator accounts</p>
           </div>
-          <div className="relative w-64">
+          <div className="relative w-full sm:w-64">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-surface-400" />
             <input
               type="text"
@@ -141,6 +142,7 @@ export function AdminCreators() {
                 <tr className="border-b border-surface-100 bg-surface-50">
                   <th className="px-4 py-3 text-left font-medium text-surface-500">Creator</th>
                   <th className="px-4 py-3 text-left font-medium text-surface-500 hidden md:table-cell">Category</th>
+                  <th className="px-4 py-3 text-left font-medium text-surface-500 hidden lg:table-cell">Location</th>
                   <th className="px-4 py-3 text-left font-medium text-surface-500 hidden lg:table-cell">Joined</th>
                   <th className="px-4 py-3 text-left font-medium text-surface-500">Status</th>
                   <th className="px-4 py-3 text-right font-medium text-surface-500">Actions</th>
@@ -169,6 +171,11 @@ export function AdminCreators() {
                     </td>
                     <td className="px-4 py-3 hidden md:table-cell">
                       {c.category && <Badge variant="default">{c.category}</Badge>}
+                    </td>
+                    <td className="px-4 py-3 text-xs text-surface-400 hidden lg:table-cell">
+                      {c.city || c.country
+                        ? [c.city, c.country].filter(Boolean).join(', ')
+                        : <span className="text-surface-300">—</span>}
                     </td>
                     <td className="px-4 py-3 text-xs text-surface-400 hidden lg:table-cell">{timeAgo(c.created_at)}</td>
                     <td className="px-4 py-3">
@@ -210,7 +217,7 @@ export function AdminCreators() {
       {drawer && (
         <>
           <div className="fixed inset-0 bg-black/20 z-40" onClick={() => setDrawer(null)} />
-          <div className="fixed right-0 top-0 h-full w-80 bg-white border-l border-surface-200 z-50 flex flex-col shadow-2xl">
+          <div className="fixed right-0 top-0 h-full w-full sm:w-80 bg-white border-l border-surface-200 z-50 flex flex-col shadow-2xl">
             {/* Drawer header */}
             <div className="flex items-center justify-between px-5 py-4 border-b border-surface-100">
               <p className="text-sm font-semibold text-surface-900">Creator Details</p>

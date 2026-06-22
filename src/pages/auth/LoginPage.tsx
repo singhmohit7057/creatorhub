@@ -4,10 +4,10 @@ import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
 import { Helmet } from 'react-helmet-async'
-import { Sparkles, Mail, Lock } from 'lucide-react'
+import { Sparkles, Mail } from 'lucide-react'
 import toast from 'react-hot-toast'
 import { supabase } from '@/lib/supabase'
-import { Input } from '@/components/common/Input'
+import { Input, PasswordInput } from '@/components/common/Input'
 import { Button } from '@/components/common/Button'
 
 const schema = z.object({
@@ -27,8 +27,21 @@ export function LoginPage() {
   })
 
   async function onSubmit(data: FormData) {
-    const { error } = await supabase.auth.signInWithPassword(data)
+    const { data: authData, error } = await supabase.auth.signInWithPassword(data)
     if (error) { toast.error(error.message); return }
+
+    const { data: profile } = await supabase
+      .from('profiles')
+      .select('role')
+      .eq('user_id', authData.user.id)
+      .single()
+
+    if (profile?.role === 'admin') {
+      await supabase.auth.signOut()
+      toast.error('Use the admin panel to sign in.')
+      return
+    }
+
     navigate(from, { replace: true })
   }
 
@@ -95,11 +108,9 @@ export function LoginPage() {
                 error={errors.email?.message}
                 {...register('email')}
               />
-              <Input
+              <PasswordInput
                 label="Password"
-                type="password"
                 placeholder="••••••••"
-                leftIcon={<Lock className="w-4 h-4" />}
                 error={errors.password?.message}
                 {...register('password')}
               />

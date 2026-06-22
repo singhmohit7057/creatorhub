@@ -49,7 +49,7 @@ export function AdminInquiries() {
   return (
     <>
       <Helmet><title>Inquiries — Admin</title></Helmet>
-      <div className="p-6 space-y-4">
+      <div className="p-4 sm:p-6 space-y-4">
 
         {/* Header */}
         <div className="flex items-center justify-between">
@@ -97,8 +97,8 @@ export function AdminInquiries() {
                     className="flex items-center gap-3 px-4 py-3 cursor-pointer hover:bg-surface-50 transition-colors"
                     onClick={() => setExpanded(expanded === inq.id ? null : inq.id)}
                   >
-                    {/* Creator */}
-                    <div className="flex items-center gap-2.5 w-40 shrink-0">
+                    {/* Creator — hidden on smallest screens */}
+                    <div className="hidden sm:flex items-center gap-2.5 w-36 shrink-0">
                       <Avatar src={inq.creator_avatar} name={inq.creator_name} size="sm" />
                       <div className="min-w-0">
                         <p className="text-xs font-medium text-surface-900 truncate">{inq.creator_name}</p>
@@ -110,6 +110,7 @@ export function AdminInquiries() {
                     <div className="flex-1 min-w-0">
                       <p className="text-sm font-semibold text-surface-900 truncate">{inq.brand_name}</p>
                       <p className="text-xs text-surface-400 truncate">{inq.contact_person} · {inq.email}</p>
+                      <p className="text-[10px] text-surface-400 sm:hidden">→ {inq.creator_name}</p>
                     </div>
 
                     {/* Budget */}

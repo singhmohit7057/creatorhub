@@ -13,6 +13,7 @@ import { Button } from '@/components/common/Button'
 import { Avatar } from '@/components/common/Avatar'
 import { SocialLinksCard } from '@/modules/dashboard/SocialLinksCard'
 import { cn } from '@/utils/helpers'
+import { APP_URL } from '@/utils/constants'
 import type { CreatorCategory } from '@/types'
 
 const CATEGORIES: { value: CreatorCategory; label: string }[] = [
@@ -66,27 +67,59 @@ export function SettingsPage() {
   const [showEmail, setShowEmail]         = useState(profile?.show_email ?? true)
   const isVerified = profile?.is_verified ?? false
   const [verifyRequested, setVerifyRequested] = useState(false)
+  const [isPublished, setIsPublished] = useState(profile?.is_published ?? false)
+  const [publishing, setPublishing]   = useState(false)
+
+  async function togglePublish() {
+    if (!profile) return
+    setPublishing(true)
+    const next = !isPublished
+    try {
+      await profileService.update(profile.id, { is_published: next })
+      setIsPublished(next)
+      await refreshProfile()
+      toast.success(next ? 'Portfolio is now live!' : 'Portfolio set to draft')
+    } catch { toast.error('Failed to update') }
+    finally { setPublishing(false) }
+  }
+
+  useEffect(() => {
+    if (!profile) return
+    supabase
+      .from('verification_requests')
+      .select('id, status')
+      .eq('profile_id', profile.id)
+      .maybeSingle()
+      .then(({ data }) => { if (data) setVerifyRequested(true) })
+  }, [profile])
 
   async function requestVerification() {
+    if (!profile) return
     try {
+      const { error } = await supabase
+        .from('verification_requests')
+        .upsert({ profile_id: profile.id, status: 'pending', reason: '' }, { onConflict: 'profile_id' })
+      if (error) throw error
       toast.success('Verification request sent!')
       setVerifyRequested(true)
     } catch { toast.error('Failed to send request') }
   }
   const [category, setCategory]           = useState<CreatorCategory | null>(profile?.category ?? null)
-  const [usernameVal, setUsernameVal]         = useState('')
+  const [usernameVal, setUsernameVal]         = useState(profile?.username ?? '')
+  const [usernameEditing, setUsernameEditing] = useState(!profile?.username_claimed)
   const [usernameSaving, setUsernameSaving]   = useState(false)
   const [copied, setCopied]                   = useState(false)
-  const [availability, setAvailability]       = useState<'idle' | 'checking' | 'available' | 'taken'>('idle')
+  const [availability, setAvailability]       = useState<'idle' | 'checking' | 'available' | 'taken' | 'same'>('idle')
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null)
 
-  const fullUrl = `${window.location.origin}/${usernameVal || ''}`
+  const fullUrl = `${APP_URL}/${usernameVal || ''}`
 
   function handleUsernameInput(val: string) {
     const slug = val.toLowerCase().replace(/[^a-z0-9_]/g, '')
     setUsernameVal(slug)
-    setAvailability('idle')
     if (debounceRef.current) clearTimeout(debounceRef.current)
+    if (slug === profile?.username) { setAvailability('same'); return }
+    setAvailability('idle')
     if (!slug || slug.length < 3) return
     setAvailability('checking')
     debounceRef.current = setTimeout(async () => {
@@ -104,11 +137,13 @@ export function SettingsPage() {
   async function saveUsername() {
     if (!profile) return
     const slug = usernameVal.trim()
-    if (!slug || availability !== 'available') return
+    if (!slug || (availability !== 'available' && availability !== 'same')) return
+    if (slug === profile.username && profile.username_claimed) { setUsernameEditing(false); return }
     setUsernameSaving(true)
     try {
-      await profileService.update(profile.id, { username: slug })
+      await profileService.update(profile.id, { username: slug, username_claimed: true })
       await refreshProfile()
+      setUsernameEditing(false)
       toast.success('Username claimed!')
     } catch { toast.error('Username already taken or invalid') }
     finally { setUsernameSaving(false) }
@@ -117,10 +152,28 @@ export function SettingsPage() {
   useEffect(() => () => { if (debounceRef.current) clearTimeout(debounceRef.current) }, [])
 
   function copyLink() {
-    navigator.clipboard.writeText(fullUrl).then(() => {
-      setCopied(true)
-      setTimeout(() => setCopied(false), 2000)
-    })
+    if (navigator.clipboard?.writeText) {
+      navigator.clipboard.writeText(fullUrl).then(() => {
+        setCopied(true)
+        setTimeout(() => setCopied(false), 2000)
+      }).catch(() => fallbackCopy())
+    } else {
+      fallbackCopy()
+    }
+  }
+
+  function fallbackCopy() {
+    const el = document.createElement('textarea')
+    el.value = fullUrl
+    el.style.position = 'fixed'
+    el.style.opacity = '0'
+    document.body.appendChild(el)
+    el.focus()
+    el.select()
+    document.execCommand('copy')
+    document.body.removeChild(el)
+    setCopied(true)
+    setTimeout(() => setCopied(false), 2000)
   }
 
   const profileForm = useForm<ProfileForm>({
@@ -175,10 +228,49 @@ export function SettingsPage() {
   return (
     <>
       <Helmet><title>Settings — Showkase</title></Helmet>
-      <div className="p-6 max-w-4xl mx-auto space-y-4">
+      <div className="p-4 sm:p-6 max-w-4xl mx-auto space-y-4">
         <div>
           <h1 className="text-xl font-bold text-surface-900">Settings</h1>
           <p className="text-surface-500 text-sm mt-0.5">Manage your account and profile details</p>
+        </div>
+
+        {/* Publish toggle */}
+        <div className={cn(
+          'rounded-2xl border p-4 flex items-center justify-between gap-4',
+          isPublished ? 'bg-emerald-50 border-emerald-200' : 'bg-white border-surface-200',
+        )}>
+          <div className="flex items-center gap-3">
+            <div className={cn(
+              'w-9 h-9 rounded-xl flex items-center justify-center shrink-0',
+              isPublished ? 'bg-emerald-100' : 'bg-surface-100',
+            )}>
+              <ExternalLink className={cn('w-4 h-4', isPublished ? 'text-emerald-600' : 'text-surface-400')} />
+            </div>
+            <div>
+              <p className={cn('text-sm font-semibold', isPublished ? 'text-emerald-800' : 'text-surface-700')}>
+                {isPublished ? 'Portfolio is Live' : 'Portfolio is Draft'}
+              </p>
+              <p className={cn('text-xs mt-0.5', isPublished ? 'text-emerald-600' : 'text-surface-400')}>
+                {isPublished
+                  ? `Visible at ${APP_URL}/${profile?.username}`
+                  : 'Only you can see it — publish to go live'}
+              </p>
+            </div>
+          </div>
+          <button
+            type="button"
+            onClick={togglePublish}
+            disabled={publishing}
+            className={cn(
+              'shrink-0 px-4 py-2 rounded-xl text-sm font-semibold transition-all border',
+              isPublished
+                ? 'bg-white border-emerald-200 text-emerald-700 hover:bg-red-50 hover:border-red-200 hover:text-red-600'
+                : 'bg-brand-600 border-brand-600 text-white hover:bg-brand-700',
+              publishing && 'opacity-60 cursor-not-allowed',
+            )}
+          >
+            {publishing ? '...' : isPublished ? 'Unpublish' : 'Publish Portfolio'}
+          </button>
         </div>
 
         {/* Portfolio URL card */}
@@ -188,51 +280,67 @@ export function SettingsPage() {
             <p className="text-sm font-semibold text-surface-900">Your Portfolio URL</p>
           </div>
 
-          {profile?.username ? (
-            /* Username already claimed — locked */
+          {!usernameEditing ? (
+            /* Locked view — shows current username with Copy / View / Edit */
             <>
-              <div className="flex items-stretch gap-2">
-                <div className="flex items-center flex-1 bg-surface-50 border border-surface-200 rounded-xl px-4 py-2.5 gap-1">
+              <div className="flex items-stretch gap-2 flex-wrap">
+                <div className="flex items-center flex-1 min-w-0 bg-surface-50 border border-surface-200 rounded-xl px-4 py-2.5 gap-1">
                   <span className="text-sm text-surface-400 font-medium whitespace-nowrap shrink-0">showkase.io/</span>
-                  <span className="text-sm font-semibold text-surface-900 flex-1">{profile.username}</span>
-                  <Lock className="w-3.5 h-3.5 text-surface-300 shrink-0" />
+                  <span className="text-sm font-semibold text-surface-900 truncate">{profile?.username}</span>
                 </div>
-                <button
-                  type="button"
-                  onClick={copyLink}
-                  className={cn(
-                    'flex items-center gap-1.5 px-3 py-2.5 rounded-xl border text-sm font-medium transition-all',
-                    copied
-                      ? 'bg-emerald-50 border-emerald-200 text-emerald-600'
-                      : 'border-surface-200 text-surface-500 hover:border-brand-300 hover:text-brand-600 hover:bg-brand-50',
+                <div className="flex gap-2 shrink-0">
+                  <button
+                    type="button"
+                    onClick={copyLink}
+                    className={cn(
+                      'flex items-center gap-1.5 px-3 py-2.5 rounded-xl border text-sm font-medium transition-all',
+                      copied
+                        ? 'bg-emerald-50 border-emerald-200 text-emerald-600'
+                        : 'border-surface-200 text-surface-500 hover:border-brand-300 hover:text-brand-600 hover:bg-brand-50',
+                    )}
+                    title="Copy portfolio link"
+                  >
+                    {copied ? <CheckCheck className="w-4 h-4" /> : <Copy className="w-4 h-4" />}
+                    <span className="hidden sm:inline">{copied ? 'Copied!' : 'Copy'}</span>
+                  </button>
+                  <a
+                    href={fullUrl}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="flex items-center gap-1.5 px-3 py-2.5 rounded-xl border border-surface-200 text-sm font-medium text-surface-500 hover:border-brand-300 hover:text-brand-600 hover:bg-brand-50 transition-all"
+                    title="Open portfolio"
+                  >
+                    <ExternalLink className="w-4 h-4" />
+                    <span className="hidden sm:inline">View</span>
+                  </a>
+                  {!profile?.username_claimed && (
+                    <button
+                      type="button"
+                      onClick={() => { setUsernameVal(profile?.username ?? ''); setAvailability('same'); setUsernameEditing(true) }}
+                      className="flex items-center gap-1.5 px-3 py-2.5 rounded-xl border border-surface-200 text-sm font-medium text-surface-500 hover:border-brand-300 hover:text-brand-600 hover:bg-brand-50 transition-all"
+                      title="Edit username"
+                    >
+                      <Pencil className="w-4 h-4" />
+                      <span className="hidden sm:inline">Edit</span>
+                    </button>
                   )}
-                  title="Copy portfolio link"
-                >
-                  {copied ? <CheckCheck className="w-4 h-4" /> : <Copy className="w-4 h-4" />}
-                  {copied ? 'Copied!' : 'Copy'}
-                </button>
-                <a
-                  href={fullUrl}
-                  target="_blank"
-                  rel="noreferrer"
-                  className="flex items-center gap-1.5 px-3 py-2.5 rounded-xl border border-surface-200 text-sm font-medium text-surface-500 hover:border-brand-300 hover:text-brand-600 hover:bg-brand-50 transition-all"
-                  title="Open portfolio"
-                >
-                  <ExternalLink className="w-4 h-4" />
-                  View
-                </a>
+                </div>
               </div>
               <p className="text-xs text-surface-400 mt-2">Only lowercase letters, numbers, and underscores.</p>
-              <p className="text-xs text-amber-600 font-medium mt-1">Username is permanent and cannot be changed once claimed.</p>
+              {profile?.username_claimed && (
+                <p className="text-xs text-amber-600 font-medium mt-1">Username is permanent and cannot be changed.</p>
+              )}
             </>
           ) : (
-            /* No username yet — claim flow */
+            /* Edit / claim flow */
             <>
               <div className="flex items-stretch gap-2">
                 <div className={cn(
                   'flex items-center flex-1 bg-surface-50 border rounded-xl overflow-hidden transition-all',
-                  availability === 'available' ? 'border-emerald-400 focus-within:ring-2 focus-within:ring-emerald-400' :
-                  availability === 'taken'     ? 'border-red-400 focus-within:ring-2 focus-within:ring-red-400' :
+                  availability === 'available' || availability === 'same'
+                    ? 'border-emerald-400 focus-within:ring-2 focus-within:ring-emerald-400' :
+                  availability === 'taken'
+                    ? 'border-red-400 focus-within:ring-2 focus-within:ring-red-400' :
                   'border-surface-200 focus-within:ring-2 focus-within:ring-brand-500 focus-within:border-transparent',
                 )}>
                   <Pencil className="w-3.5 h-3.5 text-surface-300 ml-3 shrink-0" />
@@ -243,14 +351,14 @@ export function SettingsPage() {
                     onChange={e => handleUsernameInput(e.target.value)}
                     placeholder="yourname"
                     maxLength={30}
+                    autoFocus
                     className="flex-1 py-2.5 text-sm font-medium text-surface-900 bg-transparent outline-none min-w-0"
                   />
-                  {/* inline status icon */}
                   <span className="pr-3 shrink-0">
                     {availability === 'checking' && (
                       <span className="w-4 h-4 border-2 border-surface-300 border-t-brand-500 rounded-full inline-block animate-spin" />
                     )}
-                    {availability === 'available' && (
+                    {(availability === 'available' || availability === 'same') && (
                       <CheckCheck className="w-4 h-4 text-emerald-500" />
                     )}
                     {availability === 'taken' && (
@@ -261,15 +369,26 @@ export function SettingsPage() {
                 <button
                   type="button"
                   onClick={saveUsername}
-                  disabled={usernameSaving || availability !== 'available'}
+                  disabled={usernameSaving || (availability !== 'available' && availability !== 'same')}
                   className="px-4 py-2.5 rounded-xl bg-brand-600 text-white text-sm font-semibold hover:bg-brand-700 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
                 >
-                  {usernameSaving ? 'Claiming…' : 'Claim'}
+                  {usernameSaving ? 'Saving…' : 'Save'}
                 </button>
+                {profile?.username && !profile.username_claimed && (
+                  <button
+                    type="button"
+                    onClick={() => { setUsernameVal(profile.username); setAvailability('idle'); setUsernameEditing(false) }}
+                    className="px-3 py-2.5 rounded-xl border border-surface-200 text-sm font-medium text-surface-500 hover:bg-surface-50 transition-all"
+                  >
+                    Cancel
+                  </button>
+                )}
               </div>
-              {/* availability message */}
               {availability === 'available' && (
-                <p className="text-xs text-emerald-600 font-medium mt-2">✓ Available — go ahead and claim it!</p>
+                <p className="text-xs text-emerald-600 font-medium mt-2">✓ Available</p>
+              )}
+              {availability === 'same' && (
+                <p className="text-xs text-emerald-600 font-medium mt-2">✓ This is your current username</p>
               )}
               {availability === 'taken' && (
                 <p className="text-xs text-red-500 font-medium mt-2">✕ This username is already taken.</p>
@@ -277,7 +396,6 @@ export function SettingsPage() {
               {(availability === 'idle' || availability === 'checking') && (
                 <p className="text-xs text-surface-400 mt-2">Only lowercase letters, numbers, and underscores.</p>
               )}
-              <p className="text-xs text-amber-600 font-medium mt-1">Username is permanent and cannot be changed once claimed.</p>
             </>
           )}
         </div>
@@ -285,9 +403,9 @@ export function SettingsPage() {
         {/* Profile card */}
         <form onSubmit={profileForm.handleSubmit(saveProfile)}>
           <div className="bg-white rounded-2xl border border-surface-200 p-5">
-            <div className="grid grid-cols-[160px_1fr] gap-6">
+            <div className="flex flex-col sm:grid sm:grid-cols-[160px_1fr] gap-6">
               {/* Left — avatar */}
-              <div className="flex flex-col items-center justify-start gap-3 pt-1">
+              <div className="flex sm:flex-col items-center sm:justify-start gap-4 sm:gap-3 sm:pt-1">
                 <div className="relative">
                   <Avatar src={avatarPreview} name={profile?.full_name} size="xl" />
                   <label className="absolute -bottom-1 -right-1 w-7 h-7 bg-brand-600 rounded-full flex items-center justify-center cursor-pointer hover:bg-brand-700 shadow-md transition-colors">
@@ -295,15 +413,15 @@ export function SettingsPage() {
                     <input type="file" accept="image/*" className="hidden" onChange={handleAvatarChange} />
                   </label>
                 </div>
-                <div className="text-center">
+                <div className="text-center sm:text-center">
                   <p className="text-xs font-medium text-surface-600">Profile Photo</p>
-                  <p className="text-xs text-surface-400 mt-0.5">JPG, PNG or WebP<br />Max 5MB</p>
+                  <p className="text-xs text-surface-400 mt-0.5">JPG, PNG or WebP · Max 5MB</p>
                 </div>
               </div>
 
               {/* Right — fields */}
               <div className="space-y-3">
-                <div className="grid grid-cols-2 gap-3">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                   <div>
                     <label className="text-xs font-medium text-surface-500 flex items-center gap-1 mb-1">
                       <User className="w-3 h-3" /> Full Name
@@ -342,7 +460,7 @@ export function SettingsPage() {
                   </div>
                 </div>
 
-                <div className="grid grid-cols-2 gap-3">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                   <div>
                     <label className="text-xs font-medium text-surface-500 flex items-center gap-1 mb-1">
                       <MapPin className="w-3 h-3" /> City
@@ -355,7 +473,7 @@ export function SettingsPage() {
                   </div>
                 </div>
 
-                <div className="grid grid-cols-2 gap-3">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                   {/* Phone + visibility */}
                   <div>
                     <label className="text-xs font-medium text-surface-500 mb-1 block">Phone</label>
@@ -458,46 +576,43 @@ export function SettingsPage() {
             <Lock className="w-4 h-4 text-surface-400" /> Change Password
           </p>
           <form onSubmit={passwordForm.handleSubmit(changePassword)}>
-            <div className="grid grid-cols-[160px_1fr] gap-6">
-              <div />
-              <div className="space-y-3">
-                <div className="grid grid-cols-3 gap-3">
-                  <PasswordInput
-                    label="Current Password"
-                    error={passwordForm.formState.errors.current_password?.message}
-                    {...passwordForm.register('current_password')}
-                  />
-                  <PasswordInput
-                    label={<span>New Password <span className="text-red-400">*</span></span>}
-                    error={passwordForm.formState.errors.new_password?.message}
-                    {...passwordForm.register('new_password')}
-                  />
-                  <PasswordInput
-                    label="Confirm Password"
-                    error={passwordForm.formState.errors.confirm?.message}
-                    {...passwordForm.register('confirm')}
-                  />
-                </div>
+            <div className="space-y-3">
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                <PasswordInput
+                  label="Current Password"
+                  error={passwordForm.formState.errors.current_password?.message}
+                  {...passwordForm.register('current_password')}
+                />
+                <PasswordInput
+                  label={<span>New Password <span className="text-red-400">*</span></span>}
+                  error={passwordForm.formState.errors.new_password?.message}
+                  {...passwordForm.register('new_password')}
+                />
+                <PasswordInput
+                  label="Confirm Password"
+                  error={passwordForm.formState.errors.confirm?.message}
+                  {...passwordForm.register('confirm')}
+                />
+              </div>
 
-                {/* Strength rules */}
-                <div className="grid grid-cols-4 gap-2">
-                  {PWD_RULES.map(rule => {
-                    const met = newPwd.length > 0 && rule.test(newPwd)
-                    return (
-                      <div key={rule.label} className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-medium border transition-all ${
-                        met
-                          ? 'bg-emerald-50 border-emerald-200 text-emerald-700'
-                          : 'bg-surface-50 border-surface-200 text-surface-400'
-                      }`}>
-                        {met
-                          ? <CheckCircle2 className="w-3.5 h-3.5 shrink-0 text-emerald-500" />
-                          : <Circle className="w-3.5 h-3.5 shrink-0" />
-                        }
-                        {rule.label}
-                      </div>
-                    )
-                  })}
-                </div>
+              {/* Strength rules */}
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+                {PWD_RULES.map(rule => {
+                  const met = newPwd.length > 0 && rule.test(newPwd)
+                  return (
+                    <div key={rule.label} className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-medium border transition-all ${
+                      met
+                        ? 'bg-emerald-50 border-emerald-200 text-emerald-700'
+                        : 'bg-surface-50 border-surface-200 text-surface-400'
+                    }`}>
+                      {met
+                        ? <CheckCircle2 className="w-3.5 h-3.5 shrink-0 text-emerald-500" />
+                        : <Circle className="w-3.5 h-3.5 shrink-0" />
+                      }
+                      {rule.label}
+                    </div>
+                  )
+                })}
               </div>
             </div>
             <div className="mt-4 pt-4 border-t border-surface-100 flex justify-end">
