@@ -4,7 +4,7 @@ import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
 import { Helmet } from 'react-helmet-async'
 import toast from 'react-hot-toast'
-import { Camera, Mail, MapPin, User, Lock, Pencil, CheckCircle2, Circle, Eye, EyeOff, BadgeCheck, ShieldCheck, Link2, Copy, ExternalLink, CheckCheck } from 'lucide-react'
+import { Camera, Mail, MapPin, User, Lock, Pencil, CheckCircle2, Circle, Eye, EyeOff, BadgeCheck, ShieldCheck, Link2, Copy, ExternalLink, CheckCheck, Search, Trash2, AlertTriangle } from 'lucide-react'
 import { useAuth } from '@/contexts/AuthContext'
 import { profileService } from '@/services/profileService'
 import { supabase } from '@/lib/supabase'
@@ -17,18 +17,31 @@ import { APP_URL } from '@/utils/constants'
 import type { CreatorCategory } from '@/types'
 
 const CATEGORIES: { value: CreatorCategory; label: string }[] = [
-  { value: 'fashion',    label: 'Fashion' },
-  { value: 'beauty',     label: 'Beauty' },
-  { value: 'lifestyle',  label: 'Lifestyle' },
-  { value: 'travel',     label: 'Travel' },
-  { value: 'food',       label: 'Food' },
-  { value: 'fitness',    label: 'Fitness' },
-  { value: 'tech',       label: 'Tech' },
-  { value: 'gaming',     label: 'Gaming' },
-  { value: 'education',  label: 'Education' },
-  { value: 'finance',    label: 'Finance' },
-  { value: 'parenting',  label: 'Parenting' },
-  { value: 'other',      label: 'Other' },
+  { value: 'fashion',       label: 'Fashion' },
+  { value: 'beauty',        label: 'Beauty' },
+  { value: 'lifestyle',     label: 'Lifestyle' },
+  { value: 'travel',        label: 'Travel' },
+  { value: 'food',          label: 'Food' },
+  { value: 'fitness',       label: 'Fitness' },
+  { value: 'tech',          label: 'Tech' },
+  { value: 'gaming',        label: 'Gaming' },
+  { value: 'education',     label: 'Education' },
+  { value: 'finance',       label: 'Finance' },
+  { value: 'parenting',     label: 'Parenting' },
+  { value: 'music',         label: 'Music' },
+  { value: 'entertainment', label: 'Entertainment' },
+  { value: 'sports',        label: 'Sports' },
+  { value: 'art',           label: 'Art' },
+  { value: 'photography',   label: 'Photography' },
+  { value: 'comedy',        label: 'Comedy' },
+  { value: 'diy',           label: 'DIY' },
+  { value: 'pets',          label: 'Pets' },
+  { value: 'health',        label: 'Health' },
+  { value: 'business',      label: 'Business' },
+  { value: 'automotive',    label: 'Automotive' },
+  { value: 'nature',        label: 'Nature' },
+  { value: 'motivation',    label: 'Motivation' },
+  { value: 'other',         label: 'Other' },
 ]
 
 const profileSchema = z.object({
@@ -59,6 +72,102 @@ const PWD_RULES = [
   { label: '1 special character',       test: (v: string) => /[^A-Za-z0-9]/.test(v) },
 ]
 
+function DeletionRequestCard({ profileId }: { profileId: string | null }) {
+  const [status, setStatus]         = useState<'none' | 'pending' | 'dismissed'>('none')
+  const [loading, setLoading]       = useState(true)
+  const [submitting, setSubmitting] = useState(false)
+  const [reason, setReason]         = useState('')
+
+  useEffect(() => {
+    if (!profileId) return
+    supabase
+      .from('account_deletion_requests')
+      .select('id, status')
+      .eq('profile_id', profileId)
+      .maybeSingle()
+      .then(({ data, error }) => {
+        if (!error && data) {
+          if (data.status === 'dismissed') setStatus('dismissed')
+          else if (data.status === 'pending') setStatus('pending')
+        }
+        setLoading(false)
+      })
+  }, [profileId])
+
+  async function submit() {
+    if (!profileId) return
+    setSubmitting(true)
+    const { error } = await supabase
+      .from('account_deletion_requests')
+      .upsert({ profile_id: profileId, reason, status: 'pending' }, { onConflict: 'profile_id' })
+    setSubmitting(false)
+    if (error) { toast.error('Failed to submit request'); return }
+    setStatus('pending')
+    toast.success('Deletion request submitted. Our team will review and confirm via email.')
+  }
+
+  if (loading) return null
+
+  return (
+    <div className="bg-white rounded-2xl border border-red-100 p-5">
+      <div className="flex items-center gap-2 mb-1">
+        <Trash2 className="w-4 h-4 text-red-400" />
+        <p className="text-sm font-semibold text-surface-900">Delete Account</p>
+      </div>
+      <p className="text-xs text-surface-400 mb-4">
+        Permanently delete your account and all your data. This cannot be undone.
+        Our team will review your request and confirm via email before anything is deleted.
+      </p>
+      {status === 'pending' ? (
+        <div className="flex items-center gap-2 px-3 py-2 bg-red-50 border border-red-200 rounded-xl w-fit">
+          <span className="w-2 h-2 rounded-full bg-red-400 shrink-0" />
+          <span className="text-xs font-semibold text-red-600">Deletion request submitted — pending review</span>
+        </div>
+      ) : status === 'dismissed' ? (
+        <div className="space-y-3">
+          <div className="flex items-center gap-2 px-3 py-2 bg-surface-100 border border-surface-200 rounded-xl w-fit">
+            <span className="w-2 h-2 rounded-full bg-surface-400 shrink-0" />
+            <span className="text-xs font-semibold text-surface-600">Your previous request was not approved</span>
+          </div>
+          <textarea
+            value={reason}
+            onChange={e => setReason(e.target.value)}
+            placeholder="Reason for deletion (optional)"
+            rows={2}
+            className="w-full px-3 py-2 text-sm border border-surface-200 rounded-xl resize-none focus:outline-none focus:ring-2 focus:ring-red-400 focus:border-transparent"
+          />
+          <button
+            type="button"
+            onClick={submit}
+            disabled={submitting}
+            className="px-4 py-2 rounded-xl border border-red-200 text-red-600 text-sm font-semibold hover:bg-red-50 transition-colors disabled:opacity-50"
+          >
+            {submitting ? 'Submitting…' : 'Request Again'}
+          </button>
+        </div>
+      ) : (
+        <div className="space-y-3">
+          <textarea
+            value={reason}
+            onChange={e => setReason(e.target.value)}
+            placeholder="Reason for deletion (optional)"
+            rows={2}
+            className="w-full px-3 py-2 text-sm border border-surface-200 rounded-xl resize-none focus:outline-none focus:ring-2 focus:ring-red-400 focus:border-transparent"
+          />
+          <button
+            type="button"
+            onClick={submit}
+            disabled={submitting}
+            className="px-4 py-2 rounded-xl border border-red-200 text-red-600 text-sm font-semibold hover:bg-red-50 transition-colors disabled:opacity-50"
+          >
+            {submitting ? 'Submitting…' : 'Request Account Deletion'}
+          </button>
+        </div>
+      )}
+    </div>
+  )
+}
+
 export function SettingsPage() {
   const { profile, user, refreshProfile } = useAuth()
   const [avatarPreview, setAvatarPreview] = useState<string | null>(profile?.avatar_url ?? null)
@@ -66,9 +175,24 @@ export function SettingsPage() {
   const [showPhone, setShowPhone]         = useState(profile?.show_phone ?? false)
   const [showEmail, setShowEmail]         = useState(profile?.show_email ?? true)
   const isVerified = profile?.is_verified ?? false
-  const [verifyRequested, setVerifyRequested] = useState(false)
+  const [verifyStatus, setVerifyStatus] = useState<'none' | 'pending' | 'approved' | 'rejected'>('none')
   const [isPublished, setIsPublished] = useState(profile?.is_published ?? false)
   const [publishing, setPublishing]   = useState(false)
+  const [showOnExplore, setShowOnExplore] = useState(profile?.show_on_explore ?? true)
+  const [togglingExplore, setTogglingExplore] = useState(false)
+
+  async function toggleShowOnExplore() {
+    if (!profile) return
+    setTogglingExplore(true)
+    const next = !showOnExplore
+    try {
+      await profileService.update(profile.id, { show_on_explore: next })
+      setShowOnExplore(next)
+      await refreshProfile()
+      toast.success(next ? 'Profile visible on Explore' : 'Profile hidden from Explore')
+    } catch { toast.error('Failed to update') }
+    finally { setTogglingExplore(false) }
+  }
 
   async function togglePublish() {
     if (!profile) return
@@ -90,18 +214,26 @@ export function SettingsPage() {
       .select('id, status')
       .eq('profile_id', profile.id)
       .maybeSingle()
-      .then(({ data }) => { if (data) setVerifyRequested(true) })
+      .then(({ data }) => { if (data) setVerifyStatus(data.status as 'pending' | 'approved' | 'rejected') })
   }, [profile])
 
   async function requestVerification() {
     if (!profile) return
     try {
-      const { error } = await supabase
-        .from('verification_requests')
-        .upsert({ profile_id: profile.id, status: 'pending', reason: '' }, { onConflict: 'profile_id' })
+      let error
+      if (verifyStatus === 'rejected') {
+        ;({ error } = await supabase
+          .from('verification_requests')
+          .update({ status: 'pending', reason: '' })
+          .eq('profile_id', profile.id))
+      } else {
+        ;({ error } = await supabase
+          .from('verification_requests')
+          .insert({ profile_id: profile.id, status: 'pending', reason: '' }))
+      }
       if (error) throw error
       toast.success('Verification request sent!')
-      setVerifyRequested(true)
+      setVerifyStatus('pending')
     } catch { toast.error('Failed to send request') }
   }
   const [category, setCategory]           = useState<CreatorCategory | null>(profile?.category ?? null)
@@ -234,44 +366,25 @@ export function SettingsPage() {
           <p className="text-surface-500 text-sm mt-0.5">Manage your account and profile details</p>
         </div>
 
-        {/* Publish toggle */}
-        <div className={cn(
-          'rounded-2xl border p-4 flex items-center justify-between gap-4',
-          isPublished ? 'bg-emerald-50 border-emerald-200' : 'bg-white border-surface-200',
-        )}>
-          <div className="flex items-center gap-3">
-            <div className={cn(
-              'w-9 h-9 rounded-xl flex items-center justify-center shrink-0',
-              isPublished ? 'bg-emerald-100' : 'bg-surface-100',
-            )}>
-              <ExternalLink className={cn('w-4 h-4', isPublished ? 'text-emerald-600' : 'text-surface-400')} />
+        {/* Suspension banner */}
+        {profile?.status === 'suspended' && (
+          <div className="rounded-2xl border border-amber-300 bg-amber-50 p-4 flex items-start gap-3">
+            <div className="w-9 h-9 rounded-xl bg-amber-100 flex items-center justify-center shrink-0 mt-0.5">
+              <AlertTriangle className="w-4 h-4 text-amber-600" />
             </div>
             <div>
-              <p className={cn('text-sm font-semibold', isPublished ? 'text-emerald-800' : 'text-surface-700')}>
-                {isPublished ? 'Portfolio is Live' : 'Portfolio is Draft'}
+              <p className="text-sm font-bold text-amber-800">Your account has been suspended</p>
+              <p className="text-xs text-amber-700 mt-0.5">
+                Your portfolio is hidden and some features are disabled. If you believe this is a mistake, please contact support.
               </p>
-              <p className={cn('text-xs mt-0.5', isPublished ? 'text-emerald-600' : 'text-surface-400')}>
-                {isPublished
-                  ? `Visible at ${APP_URL}/${profile?.username}`
-                  : 'Only you can see it — publish to go live'}
-              </p>
+              {profile.suspension_reason && (
+                <p className="text-xs text-amber-700 mt-1.5 font-medium">
+                  Reason: <span className="font-normal">{profile.suspension_reason}</span>
+                </p>
+              )}
             </div>
           </div>
-          <button
-            type="button"
-            onClick={togglePublish}
-            disabled={publishing}
-            className={cn(
-              'shrink-0 px-4 py-2 rounded-xl text-sm font-semibold transition-all border',
-              isPublished
-                ? 'bg-white border-emerald-200 text-emerald-700 hover:bg-red-50 hover:border-red-200 hover:text-red-600'
-                : 'bg-brand-600 border-brand-600 text-white hover:bg-brand-700',
-              publishing && 'opacity-60 cursor-not-allowed',
-            )}
-          >
-            {publishing ? '...' : isPublished ? 'Unpublish' : 'Publish Portfolio'}
-          </button>
-        </div>
+        )}
 
         {/* Portfolio URL card */}
         <div className="bg-white rounded-2xl border border-surface-200 p-5">
@@ -400,6 +513,138 @@ export function SettingsPage() {
           )}
         </div>
 
+        {/* Publish toggle */}
+        <div className={cn(
+          'rounded-2xl border p-4 flex items-center justify-between gap-4',
+          isPublished ? 'bg-emerald-50 border-emerald-200' : 'bg-white border-surface-200',
+        )}>
+          <div className="flex items-center gap-3">
+            <div className={cn(
+              'w-9 h-9 rounded-xl flex items-center justify-center shrink-0',
+              isPublished ? 'bg-emerald-100' : 'bg-surface-100',
+            )}>
+              <ExternalLink className={cn('w-4 h-4', isPublished ? 'text-emerald-600' : 'text-surface-400')} />
+            </div>
+            <div>
+              <p className={cn('text-sm font-semibold', isPublished ? 'text-emerald-800' : 'text-surface-700')}>
+                {isPublished ? 'Portfolio is Live' : 'Portfolio is Draft'}
+              </p>
+              <p className={cn('text-xs mt-0.5', isPublished ? 'text-emerald-600' : 'text-surface-400')}>
+                {isPublished
+                  ? `Visible at ${APP_URL}/${profile?.username}`
+                  : 'Only you can see it — publish to go live'}
+              </p>
+            </div>
+          </div>
+          <button
+            type="button"
+            onClick={togglePublish}
+            disabled={publishing}
+            className={cn(
+              'shrink-0 px-4 py-2 rounded-xl text-sm font-semibold transition-all border',
+              isPublished
+                ? 'bg-white border-emerald-200 text-emerald-700 hover:bg-red-50 hover:border-red-200 hover:text-red-600'
+                : 'bg-brand-600 border-brand-600 text-white hover:bg-brand-700',
+              publishing && 'opacity-60 cursor-not-allowed',
+            )}
+          >
+            {publishing ? '...' : isPublished ? 'Unpublish' : 'Publish Portfolio'}
+          </button>
+        </div>
+
+        {/* Explore visibility toggle */}
+        <div className={cn(
+          'rounded-2xl border p-4 flex items-center justify-between gap-4',
+          showOnExplore ? 'bg-white border-surface-200' : 'bg-surface-50 border-surface-200',
+        )}>
+          <div className="flex items-center gap-3">
+            <div className="w-9 h-9 rounded-xl bg-surface-100 flex items-center justify-center shrink-0">
+              <Search className="w-4 h-4 text-surface-400" />
+            </div>
+            <div>
+              <p className="text-sm font-semibold text-surface-700">Show on Explore Page</p>
+              <p className="text-xs text-surface-400 mt-0.5">
+                {showOnExplore
+                  ? 'Brands & agencies can discover you on the Explore page'
+                  : 'Your profile is hidden from the Explore page'}
+              </p>
+            </div>
+          </div>
+          <button
+            type="button"
+            onClick={toggleShowOnExplore}
+            disabled={togglingExplore}
+            className={cn(
+              'relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors focus:outline-none',
+              showOnExplore ? 'bg-brand-600' : 'bg-surface-300',
+              togglingExplore && 'opacity-60 cursor-not-allowed',
+            )}
+            role="switch"
+            aria-checked={showOnExplore}
+          >
+            <span className={cn(
+              'inline-block h-5 w-5 rounded-full bg-white shadow-sm transition-transform',
+              showOnExplore ? 'translate-x-5' : 'translate-x-0',
+            )} />
+          </button>
+        </div>
+
+        {/* Verification card */}
+        <div className={cn(
+          'rounded-2xl border p-4 flex items-center justify-between gap-4',
+          isVerified ? 'bg-emerald-50 border-emerald-200' : 'bg-white border-surface-200',
+        )}>
+          <div className="flex items-center gap-3">
+            <div className={cn(
+              'w-9 h-9 rounded-xl flex items-center justify-center shrink-0',
+              isVerified ? 'bg-emerald-100' : 'bg-surface-100',
+            )}>
+              {isVerified
+                ? <BadgeCheck className="w-4 h-4 text-emerald-600" />
+                : <ShieldCheck className="w-4 h-4 text-surface-400" />
+              }
+            </div>
+            <div>
+              <p className={cn('text-sm font-semibold', isVerified ? 'text-emerald-800' : 'text-surface-700')}>
+                {isVerified ? 'Verified Creator' : 'Not Verified'}
+              </p>
+              <p className={cn('text-xs mt-0.5', isVerified ? 'text-emerald-600' : 'text-surface-400')}>
+                {isVerified ? 'Verified badge shown on your portfolio' : 'Verification is reviewed and granted by the Showkase team'}
+              </p>
+            </div>
+          </div>
+          {isVerified ? (
+            <div className="relative inline-flex h-5 w-9 shrink-0 rounded-full bg-emerald-500 cursor-not-allowed opacity-60">
+              <span className="pointer-events-none inline-block h-4 w-4 rounded-full bg-white shadow-sm translate-x-4 mt-0.5 ml-0" />
+            </div>
+          ) : verifyStatus === 'pending' ? (
+            <span className="text-[11px] font-semibold text-amber-600 bg-amber-50 border border-amber-200 px-2.5 py-1 rounded-lg">
+              Requested
+            </span>
+          ) : verifyStatus === 'rejected' ? (
+            <div className="flex flex-col items-end gap-1">
+              <span className="text-[11px] font-semibold text-red-600 bg-red-50 border border-red-200 px-2.5 py-1 rounded-lg">
+                Rejected
+              </span>
+              <button
+                type="button"
+                onClick={requestVerification}
+                className="text-[10px] font-semibold text-brand-600 hover:underline"
+              >
+                Request again →
+              </button>
+            </div>
+          ) : (
+            <button
+              type="button"
+              onClick={requestVerification}
+              className="text-[11px] font-semibold text-brand-600 bg-brand-50 border border-brand-200 px-2.5 py-1 rounded-lg hover:bg-brand-100 transition-colors"
+            >
+              Request Verification
+            </button>
+          )}
+        </div>
+
         {/* Profile card */}
         <form onSubmit={profileForm.handleSubmit(saveProfile)}>
           <div className="bg-white rounded-2xl border border-surface-200 p-5">
@@ -516,48 +761,6 @@ export function SettingsPage() {
                   </div>
                 </div>
 
-                {/* Verified badge — read-only, admin controlled */}
-                <div className={cn(
-                  'flex items-center justify-between rounded-xl border px-4 py-3',
-                  isVerified ? 'bg-emerald-50 border-emerald-200' : 'bg-surface-50 border-surface-200',
-                )}>
-                  <div className="flex items-center gap-2.5">
-                    <div className={cn(
-                      'w-8 h-8 rounded-full flex items-center justify-center',
-                      isVerified ? 'bg-emerald-100' : 'bg-surface-100',
-                    )}>
-                      {isVerified
-                        ? <BadgeCheck className="w-4 h-4 text-emerald-600" />
-                        : <ShieldCheck className="w-4 h-4 text-surface-400" />
-                      }
-                    </div>
-                    <div>
-                      <p className={cn('text-xs font-semibold', isVerified ? 'text-emerald-800' : 'text-surface-600')}>
-                        {isVerified ? 'Verified Creator' : 'Not Verified'}
-                      </p>
-                      <p className={cn('text-[10px]', isVerified ? 'text-emerald-600' : 'text-surface-400')}>
-                        {isVerified ? 'Verified badge shown on your portfolio' : 'Verification is reviewed and granted by the Showkase team'}
-                      </p>
-                    </div>
-                  </div>
-                  {isVerified ? (
-                    <div className="relative inline-flex h-5 w-9 shrink-0 rounded-full bg-emerald-500 cursor-not-allowed opacity-60">
-                      <span className="pointer-events-none inline-block h-4 w-4 rounded-full bg-white shadow-sm translate-x-4 mt-0.5 ml-0" />
-                    </div>
-                  ) : verifyRequested ? (
-                    <span className="text-[11px] font-semibold text-amber-600 bg-amber-50 border border-amber-200 px-2.5 py-1 rounded-lg">
-                      Requested
-                    </span>
-                  ) : (
-                    <button
-                      type="button"
-                      onClick={requestVerification}
-                      className="text-[11px] font-semibold text-brand-600 bg-brand-50 border border-brand-200 px-2.5 py-1 rounded-lg hover:bg-brand-100 transition-colors"
-                    >
-                      Request Verification
-                    </button>
-                  )}
-                </div>
               </div>
             </div>
 
@@ -620,6 +823,9 @@ export function SettingsPage() {
             </div>
           </form>
         </div>
+
+        {/* Account deletion */}
+        <DeletionRequestCard profileId={profile?.id ?? null} />
       </div>
     </>
   )

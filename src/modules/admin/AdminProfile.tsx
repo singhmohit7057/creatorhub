@@ -35,7 +35,7 @@ const PWD_RULES = [
 ]
 
 export function AdminProfile() {
-  const { profile, refreshProfile } = useAuth()
+  const { profile, user, refreshProfile } = useAuth()
   const [avatarPreview, setAvatarPreview] = useState<string | null>(profile?.avatar_url ?? null)
   const [avatarFile, setAvatarFile]       = useState<File | null>(null)
   const [showNew, setShowNew]             = useState(false)
@@ -63,7 +63,7 @@ export function AdminProfile() {
     let avatar_url = profile?.avatar_url ?? null
     if (avatarFile) {
       const ext  = avatarFile.name.split('.').pop()
-      const path = `avatars/${profile!.id}.${ext}`
+      const path = `${user!.id}/avatar.${ext}`
       const { error: uploadErr } = await supabase.storage.from('avatars').upload(path, avatarFile, { upsert: true })
       if (uploadErr) { toast.error('Avatar upload failed'); return }
       const { data: { publicUrl } } = supabase.storage.from('avatars').getPublicUrl(path)

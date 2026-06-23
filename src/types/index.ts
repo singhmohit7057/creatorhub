@@ -11,7 +11,9 @@ export interface AuthUser {
 export type CreatorCategory =
   | 'fashion' | 'beauty' | 'lifestyle' | 'travel' | 'food'
   | 'fitness' | 'tech' | 'gaming' | 'education' | 'finance'
-  | 'parenting' | 'other'
+  | 'parenting' | 'music' | 'entertainment' | 'sports' | 'art'
+  | 'photography' | 'comedy' | 'diy' | 'pets' | 'health'
+  | 'business' | 'automotive' | 'nature' | 'motivation' | 'other'
 
 export type PortfolioTemplate = 'minimal' | 'modern-dark' | 'fashion-premium' | 'creative-grid'
 
@@ -50,7 +52,9 @@ export interface Profile {
   template: PortfolioTemplate
   is_published: boolean
   is_featured: boolean
+  show_on_explore: boolean
   username_claimed: boolean
+  suspension_reason: string | null
   created_at: string
   updated_at: string
 }
@@ -110,7 +114,7 @@ export interface CreatorService {
 
 // ─── Brand Collaborations ─────────────────────────────────────────────────────
 
-export type CollabContentType = 'post' | 'reel' | 'story'
+export type CollabContentType = 'post' | 'reel' | 'story' | 'video' | 'shorts' | 'website' | 'blog' | 'podcast' | 'other'
 
 export interface BrandCollaboration {
   id: string

@@ -4,7 +4,7 @@ import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
 import { Helmet } from 'react-helmet-async'
 import toast from 'react-hot-toast'
-import { Plus, Trash2, Briefcase, Pencil, Calendar, ExternalLink, ImageIcon, Film, BookImage, Clapperboard, Upload, X as XIcon, Star } from 'lucide-react'
+import { Plus, Trash2, Briefcase, Pencil, Calendar, ExternalLink, ImageIcon, Film, BookImage, Clapperboard, Upload, X as XIcon, Star, Youtube, FileText, Mic, LayoutGrid, Scissors, Globe } from 'lucide-react'
 import { useAuth } from '@/contexts/AuthContext'
 import { collaborationService } from '@/services/collaborationService'
 import { statsService }         from '@/services/statsService'
@@ -21,7 +21,7 @@ import type { BrandCollaboration, CollabContentType, PortfolioStats, ServiceType
 // ── Collab form ───────────────────────────────────────────────
 const collabSchema = z.object({
   brand_name:          z.string().min(1, 'Brand name is required'),
-  content_type:        z.enum(['post', 'reel', 'story']).nullable().optional(),
+  content_type:        z.string().nullable().optional(),
   post_url:            z.string().url('Must be a valid URL').optional().or(z.literal('')),
   project_description: z.string().optional(),
   campaign_results:    z.string().optional(),
@@ -38,9 +38,15 @@ const statsSchema = z.object({
 type StatsForm = z.infer<typeof statsSchema>
 
 const CONTENT_TYPES: { value: CollabContentType; label: string; icon: React.ReactNode }[] = [
-  { value: 'post',  label: 'Post',  icon: <ImageIcon className="w-4 h-4" /> },
-  { value: 'reel',  label: 'Reel',  icon: <Film className="w-4 h-4" /> },
-  { value: 'story', label: 'Story', icon: <BookImage className="w-4 h-4" /> },
+  { value: 'post',    label: 'Post',    icon: <ImageIcon className="w-4 h-4" /> },
+  { value: 'reel',    label: 'Reel',    icon: <Film className="w-4 h-4" /> },
+  { value: 'story',   label: 'Story',   icon: <BookImage className="w-4 h-4" /> },
+  { value: 'video',   label: 'Video',   icon: <Youtube className="w-4 h-4" /> },
+  { value: 'shorts',  label: 'Shorts',  icon: <Scissors className="w-4 h-4" /> },
+  { value: 'website', label: 'Website', icon: <Globe className="w-4 h-4" /> },
+  { value: 'blog',    label: 'Blog',    icon: <FileText className="w-4 h-4" /> },
+  { value: 'podcast', label: 'Podcast', icon: <Mic className="w-4 h-4" /> },
+  { value: 'other',   label: 'Other',   icon: <LayoutGrid className="w-4 h-4" /> },
 ]
 
 function ImageUpload({
@@ -136,7 +142,8 @@ export function CollaborationsPage() {
   const [coverFile, setCoverFile]     = useState<File | null>(null)
   const [dateMonth, setDateMonth]     = useState('')
   const [dateYear, setDateYear]       = useState('')
-  const [contentType, setContentType] = useState<CollabContentType | null>(null)
+  const [contentType, setContentType]         = useState<CollabContentType | null>(null)
+  const [customContentType, setCustomContentType] = useState('')
   // Featured collab IDs — up to 6 shown first on portfolio
   const [featuredIds, setFeaturedIds] = useState<string[]>(() => {
     try { return JSON.parse(localStorage.getItem('showkase_featured_collabs') ?? '[]') } catch { return [] }
@@ -183,7 +190,7 @@ export function CollaborationsPage() {
   function openAdd() {
     setEditing(null)
     resetCollab({ brand_name: '', content_type: null, post_url: '', project_description: '', campaign_results: '' })
-    setLogoFile(null); setCoverFile(null); setContentType(null); setDateMonth(''); setDateYear('')
+    setLogoFile(null); setCoverFile(null); setContentType(null); setCustomContentType(''); setDateMonth(''); setDateYear('')
     setModalOpen(true)
   }
 
@@ -198,6 +205,7 @@ export function CollaborationsPage() {
     })
     setLogoFile(null); setCoverFile(null)
     setContentType(collab.content_type ?? null)
+    setCustomContentType('')
     if (collab.collaboration_date) {
       const [y, m] = collab.collaboration_date.split('-')
       setDateMonth(m ?? ''); setDateYear(y ?? '')
@@ -210,17 +218,20 @@ export function CollaborationsPage() {
   async function onSubmitCollab(data: CollabForm) {
     if (!profile || !user) return
     const collaboration_date = dateYear && dateMonth ? `${dateYear}-${dateMonth}-01` : null
+    const finalContentType = (contentType === 'other' && customContentType.trim())
+      ? customContentType.trim() as CollabContentType
+      : contentType
     try {
       if (editing) {
         const updated = await collaborationService.update(editing.id, {
-          brand_name: data.brand_name, content_type: contentType, post_url: data.post_url || null,
+          brand_name: data.brand_name, content_type: finalContentType, post_url: data.post_url || null,
           project_description: data.project_description ?? null, campaign_results: data.campaign_results ?? null, collaboration_date,
         })
         setCollabs(prev => prev.map(c => c.id === editing.id ? updated : c))
         toast.success('Collaboration updated!')
       } else {
         const created = await collaborationService.create(profile.id, user.id, {
-          brand_name: data.brand_name, brand_logo_url: null, content_type: contentType,
+          brand_name: data.brand_name, brand_logo_url: null, content_type: finalContentType,
           cover_image_url: null, post_url: data.post_url || null,
           project_description: data.project_description ?? null, campaign_results: data.campaign_results ?? null,
           collaboration_date, sort_order: collabs.length,
@@ -483,15 +494,13 @@ export function CollaborationsPage() {
             <div className="flex-1 space-y-3">
               <div>
                 <label className="block text-sm font-medium text-surface-700 mb-1.5">Content Type</label>
-                <div className="flex flex-col gap-2">
+                <div className="grid grid-cols-3 gap-1.5">
                   {CONTENT_TYPES.map(ct => (
                     <button key={ct.value} type="button" onClick={() => setContentType(contentType === ct.value ? null : ct.value)}
                       className={cn(
-                        'flex items-center gap-2 px-4 py-2.5 rounded-xl border text-sm font-medium transition-all',
+                        'flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg border text-xs font-medium transition-all',
                         contentType === ct.value
-                          ? ct.value === 'reel' ? 'bg-violet-50 border-violet-300 text-violet-700'
-                            : ct.value === 'post' ? 'bg-blue-50 border-blue-300 text-blue-700'
-                            : 'bg-pink-50 border-pink-300 text-pink-700'
+                          ? 'bg-brand-50 border-brand-300 text-brand-700'
                           : 'border-surface-200 text-surface-600 hover:border-surface-300 hover:bg-surface-50',
                       )}
                     >
@@ -499,8 +508,17 @@ export function CollaborationsPage() {
                     </button>
                   ))}
                 </div>
+                {contentType === 'other' && (
+                  <input
+                    type="text"
+                    value={customContentType}
+                    onChange={e => setCustomContentType(e.target.value)}
+                    placeholder="Specify content type…"
+                    className="mt-2 w-full px-3 py-2 text-sm border border-surface-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-brand-500"
+                  />
+                )}
               </div>
-              <Input label="Link to Post / Reel" placeholder="https://instagram.com/p/..." error={errors.post_url?.message} {...rCollab('post_url')} />
+              <Input label="Link" placeholder="https://" error={errors.post_url?.message} {...rCollab('post_url')} />
             </div>
             <ImageUpload
               label="Cover"

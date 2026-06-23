@@ -119,6 +119,8 @@ export function AdminContent() {
               <thead>
                 <tr className="border-b border-surface-100 bg-surface-50">
                   <th className="px-4 py-3 text-left font-medium text-surface-500">Creator</th>
+                  <th className="px-4 py-3 text-left font-medium text-surface-500 hidden xl:table-cell">Category</th>
+                  <th className="px-4 py-3 text-left font-medium text-surface-500 hidden xl:table-cell">Location</th>
                   <th className="px-4 py-3 text-center font-medium text-surface-500">
                     <button onClick={() => setSort('views')} className={cn('hover:text-brand-600', sort === 'views' && 'text-brand-600')}>Views ↕</button>
                   </th>
@@ -146,6 +148,17 @@ export function AdminContent() {
                           <p className="text-xs text-surface-400">@{row.username}</p>
                         </div>
                       </div>
+                    </td>
+                    <td className="px-4 py-3 hidden xl:table-cell">
+                      {row.category
+                        ? <span className="capitalize text-xs font-medium text-surface-700 bg-surface-100 px-2 py-0.5 rounded-full">{row.category}</span>
+                        : <span className="text-xs text-surface-300">—</span>
+                      }
+                    </td>
+                    <td className="px-4 py-3 hidden xl:table-cell text-xs text-surface-500">
+                      {row.city && row.country ? `${row.city}, ${row.country}`
+                        : row.city || row.country
+                        || <span className="text-surface-300">—</span>}
                     </td>
                     <td className="px-4 py-3 text-center">
                       <span className={cn('text-sm font-semibold', sort === 'views' ? 'text-brand-600' : 'text-surface-700')}>{formatNumber(row.total_views)}</span>
@@ -183,6 +196,10 @@ export function AdminContent() {
                 <div className="flex-1 min-w-0">
                   <p className="text-sm font-medium text-surface-900 truncate">{row.full_name || '(no name)'}</p>
                   <p className="text-xs text-surface-400">@{row.username}</p>
+                  <div className="flex gap-2 mt-0.5 flex-wrap">
+                    {row.category && <span className="capitalize text-[10px] font-medium text-surface-600 bg-surface-100 px-1.5 py-0.5 rounded-full">{row.category}</span>}
+                    {(row.city || row.country) && <span className="text-[10px] text-surface-400">{row.city && row.country ? `${row.city}, ${row.country}` : row.city || row.country}</span>}
+                  </div>
                   <div className="flex gap-3 mt-1 text-[11px] text-surface-500">
                     <span>{formatNumber(row.total_views)} views</span>
                     <span>{row.media_count} media</span>

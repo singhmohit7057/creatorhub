@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { Helmet } from 'react-helmet-async'
-import { BadgeCheck, X, Clock, CheckCircle2, XCircle, ExternalLink } from 'lucide-react'
+import { BadgeCheck, X, Clock, CheckCircle2, XCircle, ExternalLink, AlertTriangle } from 'lucide-react'
 import toast from 'react-hot-toast'
 import { supabase } from '@/lib/supabase'
 import { Avatar } from '@/components/common/Avatar'
@@ -12,6 +12,7 @@ type VerifRequest = {
   id: string; profile_id: string; full_name: string; username: string
   avatar_url: string | null; category: string | null; followers: number
   reason: string; requested_at: string; status: 'pending' | 'approved' | 'rejected'
+  times_rejected: number
 }
 
 type FilterTab = 'all' | 'pending' | 'approved' | 'rejected'
@@ -32,7 +33,7 @@ export function AdminVerification() {
   useEffect(() => {
     supabase
       .from('verification_requests')
-      .select('id, profile_id, reason, status, requested_at, profiles(full_name, username, avatar_url, category)')
+      .select('id, profile_id, reason, status, requested_at, times_rejected, profiles(full_name, username, avatar_url, category)')
       .order('requested_at', { ascending: false })
       .limit(100)
       .then(({ data }) => {
@@ -47,6 +48,7 @@ export function AdminVerification() {
           reason: r.reason ?? '',
           requested_at: r.requested_at,
           status: r.status,
+          times_rejected: r.times_rejected ?? 0,
         }))
         setRequests(rows)
         setLoading(false)
@@ -75,10 +77,16 @@ export function AdminVerification() {
   async function reject(r: VerifRequest) {
     const [{ error: e1 }, { error: e2 }] = await Promise.all([
       supabase.from('profiles').update({ is_verified: false }).eq('id', r.profile_id),
-      supabase.from('verification_requests').update({ status: 'rejected', reviewed_at: new Date().toISOString() }).eq('id', r.id),
+      supabase.from('verification_requests').update({
+        status: 'rejected',
+        reviewed_at: new Date().toISOString(),
+        times_rejected: r.times_rejected + 1,
+      }).eq('id', r.id),
     ])
     if (e1 || e2) { toast.error((e1 || e2)!.message); return }
-    setRequests(prev => prev.map(x => x.id === r.id ? { ...x, status: 'rejected' } : x))
+    setRequests(prev => prev.map(x => x.id === r.id
+      ? { ...x, status: 'rejected', times_rejected: r.times_rejected + 1 }
+      : x))
     toast.success('Request rejected')
   }
 
@@ -157,6 +165,12 @@ export function AdminVerification() {
                       <p className="font-semibold text-surface-900">{r.full_name}</p>
                       {r.status === 'approved' && <BadgeCheck className="w-4 h-4 text-brand-500" />}
                       {r.category && <Badge variant="default">{r.category}</Badge>}
+                      {r.times_rejected > 0 && (
+                        <span className="flex items-center gap-1 text-[10px] font-bold text-orange-700 bg-orange-50 border border-orange-200 px-1.5 py-0.5 rounded-full">
+                          <AlertTriangle className="w-2.5 h-2.5" />
+                          {r.times_rejected} prior {r.times_rejected === 1 ? 'rejection' : 'rejections'}
+                        </span>
+                      )}
                     </div>
                     <p className="text-xs text-surface-400 mt-0.5">@{r.username} · {formatNumber(r.followers)} followers</p>
                   </div>

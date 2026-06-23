@@ -49,6 +49,7 @@ export const profileService = {
       .select('id,username,full_name,creator_title,bio,avatar_url,category,city,country,is_featured')
       .eq('is_published', true)
       .eq('status', 'active')
+      .eq('show_on_explore', true)
 
     if (query) {
       q = q.or(`full_name.ilike.%${query}%,username.ilike.%${query}%,creator_title.ilike.%${query}%`)

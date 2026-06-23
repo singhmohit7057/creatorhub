@@ -50,6 +50,7 @@ import { AdminAnalytics }   from '@/modules/admin/AdminAnalytics'
 import { AdminContent }      from '@/modules/admin/AdminContent'
 import { AdminProfile }      from '@/modules/admin/AdminProfile'
 import { AdminVerification } from '@/modules/admin/AdminVerification'
+import { AdminDeletions }    from '@/modules/admin/AdminDeletions'
 
 // Public portfolio
 import { PublicPortfolioPage } from '@/pages/PublicPortfolioPage'
@@ -110,6 +111,7 @@ export default function App() {
             <Route path="analytics"   element={<AdminAnalytics />} />
             <Route path="content"       element={<AdminContent />} />
             <Route path="verification" element={<AdminVerification />} />
+            <Route path="deletions"    element={<AdminDeletions />} />
             <Route path="profile"      element={<AdminProfile />} />
           </Route>
 

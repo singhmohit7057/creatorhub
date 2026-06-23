@@ -1,6 +1,6 @@
 import { useEffect, useState, useMemo } from 'react'
 import { Helmet } from 'react-helmet-async'
-import { Search, Star, Ban, Trash2, BadgeCheck, X, ExternalLink } from 'lucide-react'
+import { Search, Star, Ban, Trash2, BadgeCheck, X, ExternalLink, AlertTriangle, Lock } from 'lucide-react'
 import toast from 'react-hot-toast'
 import { supabase } from '@/lib/supabase'
 import { Avatar } from '@/components/common/Avatar'
@@ -11,12 +11,17 @@ import type { Profile } from '@/types'
 
 type FilterTab = 'all' | 'active' | 'suspended' | 'verified' | 'featured'
 
+type SuspendModal = { creator: Profile; reason: string; submitting: boolean }
+type DeleteModal  = { creator: Profile; password: string; submitting: boolean; error: string }
+
 export function AdminCreators() {
   const [creators, setCreators] = useState<Profile[]>([])
   const [loading, setLoading]   = useState(true)
   const [search, setSearch]     = useState('')
   const [tab, setTab]           = useState<FilterTab>('all')
   const [drawer, setDrawer]     = useState<Profile | null>(null)
+  const [suspendModal, setSuspendModal] = useState<SuspendModal | null>(null)
+  const [deleteModal, setDeleteModal]   = useState<DeleteModal | null>(null)
 
   useEffect(() => {
     supabase
@@ -64,21 +69,76 @@ export function AdminCreators() {
     toast.success(c.is_verified ? 'Verification removed' : 'Verified!')
   }
 
-  async function toggleSuspend(c: Profile) {
-    const newStatus = c.status === 'suspended' ? 'active' : 'suspended'
-    const { error } = await supabase.from('profiles').update({ status: newStatus }).eq('id', c.id)
-    if (error) { toast.error('Failed'); return }
-    update(c.id, { status: newStatus })
-    toast.success(newStatus === 'suspended' ? 'Account suspended' : 'Account restored')
+  function openSuspend(c: Profile) {
+    if (c.status === 'suspended') {
+      // Restore immediately — no modal needed
+      restoreAccount(c)
+    } else {
+      setSuspendModal({ creator: c, reason: '', submitting: false })
+    }
   }
 
-  async function deleteCreator(c: Profile) {
-    if (!confirm(`Delete ${c.full_name}? This cannot be undone.`)) return
-    const { error } = await supabase.auth.admin.deleteUser(c.user_id)
-    if (error) { toast.error(error.message); return }
-    setCreators(prev => prev.filter(x => x.id !== c.id))
-    setDrawer(null)
-    toast.success('Deleted')
+  async function restoreAccount(c: Profile) {
+    const { error } = await supabase.from('profiles').update({
+      status: 'active',
+      suspension_reason: null,
+      is_published: true,
+    }).eq('id', c.id)
+    if (error) { toast.error('Failed'); return }
+    update(c.id, { status: 'active', suspension_reason: null, is_published: true })
+    toast.success('Account restored')
+  }
+
+  async function confirmSuspend() {
+    if (!suspendModal) return
+    setSuspendModal(m => m ? { ...m, submitting: true } : null)
+    const { error } = await supabase.from('profiles').update({
+      status: 'suspended',
+      suspension_reason: suspendModal.reason.trim() || null,
+      is_published: false,
+    }).eq('id', suspendModal.creator.id)
+    if (error) { toast.error('Failed'); setSuspendModal(m => m ? { ...m, submitting: false } : null); return }
+    update(suspendModal.creator.id, {
+      status: 'suspended',
+      suspension_reason: suspendModal.reason.trim() || null,
+      is_published: false,
+    })
+    setSuspendModal(null)
+    toast.success('Account suspended')
+  }
+
+  function openDelete(c: Profile) {
+    setDeleteModal({ creator: c, password: '', submitting: false, error: '' })
+  }
+
+  async function confirmDelete() {
+    if (!deleteModal) return
+    setDeleteModal(m => m ? { ...m, submitting: true, error: '' } : null)
+    try {
+      const { data: { session } } = await supabase.auth.getSession()
+      const res = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/delete-user`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${session?.access_token}`,
+        },
+        body: JSON.stringify({
+          targetUserId: deleteModal.creator.user_id,
+          adminPassword: deleteModal.password,
+        }),
+      })
+      const json = await res.json()
+      if (!res.ok) {
+        setDeleteModal(m => m ? { ...m, submitting: false, error: json.error ?? 'Failed' } : null)
+        return
+      }
+      setCreators(prev => prev.filter(x => x.id !== deleteModal.creator.id))
+      if (drawer?.id === deleteModal.creator.id) setDrawer(null)
+      setDeleteModal(null)
+      toast.success(`${deleteModal.creator.full_name} deleted`)
+    } catch (e) {
+      setDeleteModal(m => m ? { ...m, submitting: false, error: String(e) } : null)
+    }
   }
 
   const TABS: { key: FilterTab; label: string }[] = [
@@ -144,13 +204,14 @@ export function AdminCreators() {
                   <th className="px-4 py-3 text-left font-medium text-surface-500 hidden md:table-cell">Category</th>
                   <th className="px-4 py-3 text-left font-medium text-surface-500 hidden lg:table-cell">Location</th>
                   <th className="px-4 py-3 text-left font-medium text-surface-500 hidden lg:table-cell">Joined</th>
+                  <th className="px-4 py-3 text-left font-medium text-surface-500 hidden xl:table-cell">Last Active</th>
                   <th className="px-4 py-3 text-left font-medium text-surface-500">Status</th>
                   <th className="px-4 py-3 text-right font-medium text-surface-500">Actions</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-surface-100">
                 {filtered.length === 0 ? (
-                  <tr><td colSpan={5} className="px-4 py-10 text-center text-sm text-surface-400">No creators found</td></tr>
+                  <tr><td colSpan={6} className="px-4 py-10 text-center text-sm text-surface-400">No creators found</td></tr>
                 ) : filtered.map(c => (
                   <tr
                     key={c.id}
@@ -178,6 +239,7 @@ export function AdminCreators() {
                         : <span className="text-surface-300">—</span>}
                     </td>
                     <td className="px-4 py-3 text-xs text-surface-400 hidden lg:table-cell">{timeAgo(c.created_at)}</td>
+                    <td className="px-4 py-3 text-xs text-surface-400 hidden xl:table-cell">{timeAgo(c.updated_at)}</td>
                     <td className="px-4 py-3">
                       <div className="flex items-center gap-1.5 flex-wrap">
                         {c.is_published ? <Badge variant="success">Live</Badge> : <Badge variant="default">Draft</Badge>}
@@ -186,22 +248,18 @@ export function AdminCreators() {
                       </div>
                     </td>
                     <td className="px-4 py-3">
-                      <div className="flex items-center gap-1 justify-end" onClick={e => e.stopPropagation()}>
-                        <button onClick={() => toggleFeatured(c)} title={c.is_featured ? 'Unfeature' : 'Feature'}
-                          className={cn('p-1.5 rounded-lg transition-colors', c.is_featured ? 'text-yellow-500 bg-yellow-50' : 'text-surface-400 hover:text-yellow-500 hover:bg-yellow-50')}>
-                          <Star className="w-4 h-4" />
+                      <div className="flex items-center gap-1.5 justify-end" onClick={e => e.stopPropagation()}>
+                        <button onClick={() => toggleFeatured(c)}
+                          className={cn('flex items-center gap-1 px-2.5 py-1 rounded-lg border text-xs font-medium transition-all', c.is_featured ? 'border-yellow-200 text-yellow-700 bg-yellow-50 hover:bg-yellow-100' : 'border-surface-200 text-surface-500 hover:border-yellow-200 hover:text-yellow-700 hover:bg-yellow-50')}>
+                          <Star className="w-3 h-3" />{c.is_featured ? 'Unfeature' : 'Feature'}
                         </button>
-                        <button onClick={() => toggleVerified(c)} title={c.is_verified ? 'Remove verification' : 'Verify'}
-                          className={cn('p-1.5 rounded-lg transition-colors', c.is_verified ? 'text-brand-500 bg-brand-50' : 'text-surface-400 hover:text-brand-500 hover:bg-brand-50')}>
-                          <BadgeCheck className="w-4 h-4" />
+                        <button onClick={() => openSuspend(c)}
+                          className={cn('flex items-center gap-1 px-2.5 py-1 rounded-lg border text-xs font-medium transition-all', c.status === 'suspended' ? 'border-amber-200 text-amber-700 bg-amber-50 hover:bg-amber-100' : 'border-surface-200 text-surface-500 hover:border-amber-200 hover:text-amber-700 hover:bg-amber-50')}>
+                          <Ban className="w-3 h-3" />{c.status === 'suspended' ? 'Restore' : 'Suspend'}
                         </button>
-                        <button onClick={() => toggleSuspend(c)} title={c.status === 'suspended' ? 'Restore' : 'Suspend'}
-                          className={cn('p-1.5 rounded-lg transition-colors', c.status === 'suspended' ? 'text-amber-600 bg-amber-50' : 'text-surface-400 hover:text-amber-600 hover:bg-amber-50')}>
-                          <Ban className="w-4 h-4" />
-                        </button>
-                        <button onClick={() => deleteCreator(c)} title="Delete"
-                          className="p-1.5 rounded-lg text-surface-400 hover:text-red-600 hover:bg-red-50 transition-colors">
-                          <Trash2 className="w-4 h-4" />
+                        <button onClick={() => openDelete(c)}
+                          className="flex items-center gap-1 px-2.5 py-1 rounded-lg border border-surface-200 text-xs font-medium text-surface-500 hover:border-red-200 hover:text-red-600 hover:bg-red-50 transition-all">
+                          <Trash2 className="w-3 h-3" />Delete
                         </button>
                       </div>
                     </td>
@@ -212,6 +270,103 @@ export function AdminCreators() {
           )}
         </div>
       </div>
+
+      {/* Suspend Modal */}
+      {suspendModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 px-4">
+          <div className="bg-white rounded-2xl shadow-xl w-full max-w-sm p-6 space-y-4">
+            <div className="flex items-center gap-2">
+              <div className="w-9 h-9 rounded-xl bg-amber-50 flex items-center justify-center shrink-0">
+                <AlertTriangle className="w-4 h-4 text-amber-600" />
+              </div>
+              <div>
+                <p className="text-sm font-bold text-surface-900">Suspend Account</p>
+                <p className="text-xs text-surface-400">{suspendModal.creator.full_name}</p>
+              </div>
+            </div>
+            <p className="text-xs text-surface-500">
+              Portfolio will be unpublished and the creator will see a suspension notice in their settings.
+            </p>
+            <div>
+              <label className="text-xs font-medium text-surface-500 mb-1 block">Reason <span className="text-surface-300">(optional)</span></label>
+              <textarea
+                value={suspendModal.reason}
+                onChange={e => setSuspendModal(m => m ? { ...m, reason: e.target.value } : null)}
+                placeholder="e.g. Violation of community guidelines"
+                rows={3}
+                className="w-full px-3 py-2 text-sm border border-surface-200 rounded-xl resize-none focus:outline-none focus:ring-2 focus:ring-amber-400"
+              />
+            </div>
+            <div className="flex gap-2">
+              <button
+                onClick={() => setSuspendModal(null)}
+                className="flex-1 py-2 rounded-xl border border-surface-200 text-sm font-medium text-surface-600 hover:bg-surface-50 transition-all"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={confirmSuspend}
+                disabled={suspendModal.submitting}
+                className="flex-1 py-2 rounded-xl bg-amber-500 hover:bg-amber-600 text-white text-sm font-semibold transition-all disabled:opacity-50"
+              >
+                {suspendModal.submitting ? 'Suspending…' : 'Suspend'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Delete Modal */}
+      {deleteModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 px-4">
+          <div className="bg-white rounded-2xl shadow-xl w-full max-w-sm p-6 space-y-4">
+            <div className="flex items-center gap-2">
+              <div className="w-9 h-9 rounded-xl bg-red-50 flex items-center justify-center shrink-0">
+                <Trash2 className="w-4 h-4 text-red-500" />
+              </div>
+              <div>
+                <p className="text-sm font-bold text-surface-900">Delete Account</p>
+                <p className="text-xs text-surface-400">{deleteModal.creator.full_name}</p>
+              </div>
+            </div>
+            <p className="text-xs text-surface-500">
+              This is <span className="font-semibold text-red-600">permanent and irreversible</span>. Enter your admin password to confirm.
+            </p>
+            <div>
+              <label className="text-xs font-medium text-surface-500 mb-1 block flex items-center gap-1">
+                <Lock className="w-3 h-3" /> Admin Password
+              </label>
+              <input
+                type="password"
+                value={deleteModal.password}
+                onChange={e => setDeleteModal(m => m ? { ...m, password: e.target.value, error: '' } : null)}
+                onKeyDown={e => e.key === 'Enter' && confirmDelete()}
+                placeholder="Enter your password"
+                className="w-full px-3 py-2 text-sm border border-surface-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-red-400"
+                autoFocus
+              />
+              {deleteModal.error && (
+                <p className="text-xs text-red-500 font-medium mt-1">{deleteModal.error}</p>
+              )}
+            </div>
+            <div className="flex gap-2">
+              <button
+                onClick={() => setDeleteModal(null)}
+                className="flex-1 py-2 rounded-xl border border-surface-200 text-sm font-medium text-surface-600 hover:bg-surface-50 transition-all"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={confirmDelete}
+                disabled={deleteModal.submitting || !deleteModal.password}
+                className="flex-1 py-2 rounded-xl bg-red-600 hover:bg-red-700 text-white text-sm font-semibold transition-all disabled:opacity-50"
+              >
+                {deleteModal.submitting ? 'Deleting…' : 'Delete'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Detail Drawer */}
       {drawer && (
@@ -263,6 +418,9 @@ export function AdminCreators() {
                   <span className="font-medium">Joined:</span> {timeAgo(drawer.created_at)}
                 </div>
                 <div className="flex items-center gap-2 text-xs text-surface-500">
+                  <span className="font-medium">Last Active:</span> {timeAgo(drawer.updated_at)}
+                </div>
+                <div className="flex items-center gap-2 text-xs text-surface-500">
                   <span className="font-medium">Template:</span> <span className="capitalize">{drawer.template}</span>
                 </div>
               </div>
@@ -288,7 +446,7 @@ export function AdminCreators() {
                   className={cn('py-2 rounded-xl text-xs font-semibold transition-all border', drawer.is_verified ? 'bg-brand-50 border-brand-200 text-brand-700' : 'border-surface-200 text-surface-600 hover:bg-brand-50 hover:border-brand-200 hover:text-brand-700')}>
                   {drawer.is_verified ? 'Unverify' : 'Verify'}
                 </button>
-                <button onClick={() => toggleSuspend(drawer)}
+                <button onClick={() => openSuspend(drawer)}
                   className={cn('py-2 rounded-xl text-xs font-semibold transition-all border', drawer.status === 'suspended' ? 'bg-amber-50 border-amber-200 text-amber-700' : 'border-surface-200 text-surface-600 hover:bg-amber-50 hover:border-amber-200 hover:text-amber-700')}>
                   {drawer.status === 'suspended' ? 'Restore' : 'Suspend'}
                 </button>
@@ -318,7 +476,7 @@ export function AdminCreators() {
                   ))}
                 </div>
               </div>
-              <button onClick={() => deleteCreator(drawer)}
+              <button onClick={() => openDelete(drawer)}
                 className="w-full py-2 rounded-xl border border-red-200 text-xs font-semibold text-red-600 hover:bg-red-50 transition-all">
                 Delete Account
               </button>

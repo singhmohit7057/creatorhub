@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import { Helmet } from 'react-helmet-async'
 import { Link } from 'react-router-dom'
-import { Users, Globe, Eye, Image, MailOpen, UserPlus, Activity, BadgeCheck } from 'lucide-react'
+import { Users, Globe, Eye, Trash2, MailOpen, UserPlus, Activity, BadgeCheck } from 'lucide-react'
 import { supabase } from '@/lib/supabase'
 import { StatCard } from '@/components/common/StatCard'
 import { Avatar } from '@/components/common/Avatar'
@@ -21,7 +21,8 @@ interface AdminStats {
   total_users: number
   total_portfolios: number
   total_views: number
-  total_media_uploads: number
+  pending_deletions: number
+  deleted_accounts: number
   new_users_today: number
   new_users_week: number
   active_this_week: number
@@ -44,7 +45,8 @@ export function AdminDashboard() {
       supabase.from('profiles').select('*', { count: 'exact', head: true }).neq('role', 'admin'),
       supabase.from('profiles').select('*', { count: 'exact', head: true }).neq('role', 'admin').eq('is_published', true),
       supabase.from('analytics_events').select('*', { count: 'exact', head: true }).eq('event_type', 'portfolio_view'),
-      supabase.from('media_files').select('*', { count: 'exact', head: true }),
+      supabase.from('account_deletion_requests').select('*', { count: 'exact', head: true }).eq('status', 'pending'),
+      supabase.from('account_deletion_requests').select('*', { count: 'exact', head: true }).eq('status', 'deleted'),
       supabase.from('profiles').select('*', { count: 'exact', head: true }).neq('role', 'admin').gte('created_at', today),
       supabase.from('profiles').select('*', { count: 'exact', head: true }).neq('role', 'admin').gte('created_at', weekAgo),
       supabase.from('profiles').select('*', { count: 'exact', head: true }).neq('role', 'admin').gte('updated_at', weekAgo).eq('status', 'active'),
@@ -57,7 +59,8 @@ export function AdminDashboard() {
       { count: total_users },
       { count: total_portfolios },
       { count: total_views },
-      { count: total_media_uploads },
+      { count: pending_deletions },
+      { count: deleted_accounts },
       { count: new_users_today },
       { count: new_users_week },
       { count: active_this_week },
@@ -68,15 +71,16 @@ export function AdminDashboard() {
       { count: approved_verifications },
     ]) => {
       setStats({
-        total_users:           total_users           ?? 0,
-        total_portfolios:      total_portfolios      ?? 0,
-        total_views:           total_views           ?? 0,
-        total_media_uploads:   total_media_uploads   ?? 0,
-        new_users_today:       new_users_today       ?? 0,
-        new_users_week:        new_users_week        ?? 0,
-        active_this_week:      active_this_week      ?? 0,
-        unread_inquiries:      unread_inquiries      ?? 0,
-        pending_verifications: pending_verifications ?? 0,
+        total_users:            total_users            ?? 0,
+        total_portfolios:       total_portfolios       ?? 0,
+        total_views:            total_views            ?? 0,
+        pending_deletions:      pending_deletions      ?? 0,
+        deleted_accounts:       deleted_accounts       ?? 0,
+        new_users_today:        new_users_today        ?? 0,
+        new_users_week:         new_users_week         ?? 0,
+        active_this_week:       active_this_week       ?? 0,
+        unread_inquiries:       unread_inquiries       ?? 0,
+        pending_verifications:  pending_verifications  ?? 0,
         approved_verifications: approved_verifications ?? 0,
       })
       setRecent((profiles as Profile[]) ?? [])
@@ -114,7 +118,25 @@ export function AdminDashboard() {
               <StatCard title="Total Creators"   value={formatNumber(stats.total_users)}         icon={<Users className="w-5 h-5" />} trend={{ value: stats.new_users_week, label: 'new this week', unit: '' }} />
               <StatCard title="Live Portfolios"  value={formatNumber(stats.total_portfolios)}    icon={<Globe className="w-5 h-5" />} />
               <StatCard title="Platform Views"   value={formatNumber(stats.total_views)}         icon={<Eye   className="w-5 h-5" />} />
-              <StatCard title="Media Uploads"    value={formatNumber(stats.total_media_uploads)} icon={<Image className="w-5 h-5" />} />
+              <div className="bg-white rounded-2xl border border-surface-200 p-4 space-y-2">
+                <div className="flex items-center justify-between">
+                  <p className="text-xs font-medium text-surface-500">Delete Requests</p>
+                  <div className="w-8 h-8 rounded-xl bg-red-50 flex items-center justify-center">
+                    <Trash2 className="w-4 h-4 text-red-500" />
+                  </div>
+                </div>
+                <div className="flex items-end gap-3">
+                  <div>
+                    <p className="text-2xl font-black text-surface-900">{stats.pending_deletions}</p>
+                    <p className="text-[11px] text-amber-600 font-medium mt-0.5">Pending</p>
+                  </div>
+                  <div className="w-px h-8 bg-surface-100" />
+                  <div>
+                    <p className="text-2xl font-black text-surface-900">{stats.deleted_accounts}</p>
+                    <p className="text-[11px] text-red-500 font-medium mt-0.5">Deleted</p>
+                  </div>
+                </div>
+              </div>
             </div>
             <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
               <StatCard title="Signups Today"          value={stats.new_users_today}          icon={<UserPlus   className="w-5 h-5" />} />

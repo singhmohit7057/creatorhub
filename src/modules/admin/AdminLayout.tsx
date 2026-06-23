@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { Link, Outlet, useLocation, useNavigate } from 'react-router-dom'
-import { LayoutDashboard, Users, MessageSquare, BarChart2, Image, ShieldCheck, LogOut, UserCircle, BadgeCheck, Menu, X } from 'lucide-react'
+import { LayoutDashboard, Users, MessageSquare, BarChart2, Image, ShieldCheck, LogOut, UserCircle, BadgeCheck, Trash2, Menu, X } from 'lucide-react'
 import toast from 'react-hot-toast'
 import { cn } from '@/utils/helpers'
 import { supabase } from '@/lib/supabase'
@@ -13,6 +13,7 @@ const navItems = [
   { href: '/admin/content',      icon: Image,           label: 'Content'      },
   { href: '/admin/inquiries',    icon: MessageSquare,   label: 'Inquiries'    },
   { href: '/admin/verification', icon: BadgeCheck,      label: 'Verification' },
+  { href: '/admin/deletions',    icon: Trash2,          label: 'Deletions'    },
   { href: '/admin/analytics',    icon: BarChart2,       label: 'Analytics'    },
 ]
 
@@ -20,9 +21,10 @@ export function AdminLayout() {
   const location = useLocation()
   const navigate  = useNavigate()
   const { profile, signOut } = useAuth()
-  const [unread, setUnread]             = useState(0)
-  const [pendingVerif, setPendingVerif] = useState(0)
-  const [sidebarOpen, setSidebarOpen]   = useState(false)
+  const [unread, setUnread]                 = useState(0)
+  const [pendingVerif, setPendingVerif]     = useState(0)
+  const [pendingDeletions, setPendingDeletions] = useState(0)
+  const [sidebarOpen, setSidebarOpen]       = useState(false)
 
   useEffect(() => {
     supabase
@@ -30,7 +32,16 @@ export function AdminLayout() {
       .select('id', { count: 'exact', head: true })
       .eq('is_read', false)
       .then(({ count }) => setUnread(count ?? 0))
-    setPendingVerif(0)
+    supabase
+      .from('verification_requests')
+      .select('id', { count: 'exact', head: true })
+      .eq('status', 'pending')
+      .then(({ count }) => setPendingVerif(count ?? 0))
+    supabase
+      .from('account_deletion_requests')
+      .select('id', { count: 'exact', head: true })
+      .eq('status', 'pending')
+      .then(({ count }) => setPendingDeletions(count ?? 0))
   }, [])
 
   // Close sidebar on route change
@@ -84,6 +95,11 @@ export function AdminLayout() {
               {item.label === 'Verification' && pendingVerif > 0 && (
                 <span className="text-[10px] font-bold bg-amber-500 text-white px-1.5 py-0.5 rounded-full leading-none">
                   {pendingVerif}
+                </span>
+              )}
+              {item.label === 'Deletions' && pendingDeletions > 0 && (
+                <span className="text-[10px] font-bold bg-red-500 text-white px-1.5 py-0.5 rounded-full leading-none">
+                  {pendingDeletions}
                 </span>
               )}
             </Link>
