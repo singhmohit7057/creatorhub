@@ -65,7 +65,7 @@ export function ExplorePage() {
 
         {/* Search + Filters */}
         <div className="flex flex-col sm:flex-row gap-3 mb-8">
-          <div className="flex-1">
+          <div className="flex-1 min-w-0">
             <Input
               placeholder="Search by name or username..."
               value={query}
@@ -73,20 +73,22 @@ export function ExplorePage() {
               leftIcon={<Search className="w-4 h-4" />}
             />
           </div>
-          <Select
-            options={CREATOR_CATEGORIES.map(c => ({ value: c.value, label: `${c.emoji} ${c.label}` }))}
-            placeholder="All Categories"
-            value={category}
-            onChange={e => setCategory(e.target.value)}
-            className="sm:w-48"
-          />
-          <Select
-            options={COUNTRIES.map(c => ({ value: c, label: c }))}
-            placeholder="All Countries"
-            value={country}
-            onChange={e => setCountry(e.target.value)}
-            className="sm:w-44"
-          />
+          <div className="sm:w-48 shrink-0">
+            <Select
+              options={CREATOR_CATEGORIES.map(c => ({ value: c.value, label: `${c.emoji} ${c.label}` }))}
+              placeholder="All Categories"
+              value={category}
+              onChange={e => setCategory(e.target.value)}
+            />
+          </div>
+          <div className="sm:w-44 shrink-0">
+            <Select
+              options={COUNTRIES.map(c => ({ value: c, label: c }))}
+              placeholder="All Countries"
+              value={country}
+              onChange={e => setCountry(e.target.value)}
+            />
+          </div>
         </div>
 
         {/* Results */}

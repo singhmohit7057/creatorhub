@@ -17,9 +17,9 @@ const stats = [
 ]
 
 const team = [
-  { initials: 'RK', name: 'Rahul Kumar',  role: 'Co-founder & CEO',     from: 'from-violet-400', to: 'to-indigo-500' },
-  { initials: 'PS', name: 'Priya Singh',  role: 'Co-founder & Design',  from: 'from-pink-400',   to: 'to-rose-500'   },
-  { initials: 'AM', name: 'Aryan Mehta',  role: 'Engineering',          from: 'from-orange-400', to: 'to-amber-500'  },
+  { name: 'Muskaan Singh',  role: 'Idea & Vision',    img: '/Muskaan-Singh.webp'  },
+  { name: 'Mohit Singh',    role: 'Co-founder, TMMT', img: '/Mohit-Singh.webp'    },
+  { name: 'Harsh Aggarwal', role: 'Co-founder, TMMT', img: '/Harsh-Aggarwal.webp' },
 ]
 
 export function AboutPage() {
@@ -147,9 +147,11 @@ export function AboutPage() {
           <div className="flex flex-wrap justify-center gap-6">
             {team.map(t => (
               <div key={t.name} className="bg-slate-50 border border-slate-100 rounded-2xl p-6 w-44 text-center hover:shadow-[0_4px_20px_-4px_rgba(0,0,0,0.08)] transition-all">
-                <div className={`w-14 h-14 rounded-2xl bg-gradient-to-br ${t.from} ${t.to} flex items-center justify-center text-white font-bold text-lg mx-auto mb-3`}>
-                  {t.initials}
-                </div>
+                <img
+                  src={t.img}
+                  alt={t.name}
+                  className="w-36 h-36 rounded-2xl object-cover mx-auto mb-3"
+                />
                 <p className="font-semibold text-slate-900 text-sm">{t.name}</p>
                 <p className="text-xs text-slate-400 mt-0.5">{t.role}</p>
               </div>
