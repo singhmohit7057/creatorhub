@@ -14,7 +14,6 @@ async function track(payload: Record<string, unknown>) {
     if (res.ok) return
     throw new Error(`edge fn ${res.status}`)
   } catch {
-    // Edge function unavailable (local dev) — insert directly
     try {
       await supabase.from('analytics_events').insert({
         profile_id: payload.profile_id,
@@ -30,9 +29,13 @@ async function track(payload: Record<string, unknown>) {
   }
 }
 
-export interface DailyView { date: string; views: number }
+export interface DailyView    { date: string; views: number }
 export interface ReferrerEntry { referrer: string; count: number }
-export interface CountryEntry { country: string; count: number }
+export interface CountryEntry  { country: string; count: number }
+
+interface RPCViewRow     { date: string; views: string }
+interface RPCReferrerRow { referrer: string; count: string }
+interface RPCSocialRow   { platform: string; count: string }
 
 export const analyticsService = {
   // ── Write via edge function ────────────────────────────────
@@ -63,110 +66,63 @@ export const analyticsService = {
     })
   },
 
-  // ── Read directly from Supabase ────────────────────────────
+  // ── Read via RPC (aggregated in Postgres, not client-side) ──
 
   async getSummary(profileId: string): Promise<AnalyticsSummary> {
-    const now          = new Date()
-    const weekAgo      = new Date(now.getTime() -  7 * 86400_000).toISOString()
-    const twoWeeksAgo  = new Date(now.getTime() - 14 * 86400_000).toISOString()
-
-    const [totalViewsRes, uniqueRes, contactRes, thisWeekRes, lastWeekRes] = await Promise.all([
-      supabase.from('analytics_events').select('*', { count: 'exact', head: true })
-        .eq('profile_id', profileId).eq('event_type', 'portfolio_view'),
-      supabase.from('analytics_events').select('visitor_id')
-        .eq('profile_id', profileId).eq('event_type', 'portfolio_view'),
-      supabase.from('analytics_events').select('*', { count: 'exact', head: true })
-        .eq('profile_id', profileId).eq('event_type', 'contact_submission'),
-      supabase.from('analytics_events').select('*', { count: 'exact', head: true })
-        .eq('profile_id', profileId).eq('event_type', 'portfolio_view')
-        .gte('created_at', weekAgo),
-      supabase.from('analytics_events').select('*', { count: 'exact', head: true })
-        .eq('profile_id', profileId).eq('event_type', 'portfolio_view')
-        .gte('created_at', twoWeeksAgo).lt('created_at', weekAgo),
-    ])
-
-    const uniqueVisitors = new Set(uniqueRes.data?.map(r => r.visitor_id)).size
-
-    return {
-      total_views:         totalViewsRes.count ?? 0,
-      unique_visitors:     uniqueVisitors,
-      contact_submissions: contactRes.count    ?? 0,
-      views_this_week:     thisWeekRes.count   ?? 0,
-      views_last_week:     lastWeekRes.count   ?? 0,
+    const { data, error } = await supabase.rpc('get_analytics_summary', {
+      p_profile_id: profileId,
+    })
+    if (error || !data) {
+      return { total_views: 0, unique_visitors: 0, contact_submissions: 0, views_this_week: 0, views_last_week: 0 }
     }
+    return data as AnalyticsSummary
   },
 
   async getDailyViews(profileId: string, days = 30): Promise<DailyView[]> {
-    const since = new Date(Date.now() - days * 86400_000).toISOString()
-    const { data } = await supabase
-      .from('analytics_events')
-      .select('created_at')
-      .eq('profile_id', profileId)
-      .eq('event_type', 'portfolio_view')
-      .gte('created_at', since)
-      .order('created_at', { ascending: true })
-
-    // Group by date client-side
-    const counts: Record<string, number> = {}
-    for (let i = 0; i < days; i++) {
-      const d = new Date(Date.now() - (days - 1 - i) * 86400_000)
-      counts[d.toISOString().slice(0, 10)] = 0
-    }
-    for (const row of data ?? []) {
-      const day = (row.created_at as string).slice(0, 10)
-      if (day in counts) counts[day]++
-    }
-    return Object.entries(counts).map(([date, views]) => ({ date, views }))
+    const { data } = await supabase.rpc('get_daily_views_v2', {
+      p_profile_id: profileId,
+      p_days:       days,
+    })
+    return ((data as RPCViewRow[]) ?? []).map(row => ({
+      date:  row.date,
+      views: Number(row.views),
+    }))
   },
 
   async getTopReferrers(profileId: string): Promise<ReferrerEntry[]> {
-    const { data } = await supabase
-      .from('analytics_events')
-      .select('referrer')
-      .eq('profile_id', profileId)
-      .eq('event_type', 'portfolio_view')
-      .not('referrer', 'is', null)
-
-    const counts: Record<string, number> = {}
-    for (const row of data ?? []) {
-      let ref = row.referrer as string
+    const { data } = await supabase.rpc('get_top_referrers_v2', {
+      p_profile_id: profileId,
+    })
+    return ((data as RPCReferrerRow[]) ?? []).map(row => {
+      let ref = row.referrer
       try { ref = new URL(ref).hostname.replace('www.', '') } catch { /* keep raw */ }
-      counts[ref] = (counts[ref] ?? 0) + 1
-    }
-    return Object.entries(counts)
-      .map(([referrer, count]) => ({ referrer, count }))
-      .sort((a, b) => b.count - a.count)
-      .slice(0, 5)
+      return { referrer: ref, count: Number(row.count) }
+    })
   },
 
   async getSocialClicks(profileId: string): Promise<Record<string, number>> {
-    const { data } = await supabase
-      .from('analytics_events')
-      .select('platform')
-      .eq('profile_id', profileId)
-      .eq('event_type', 'social_click')
-      .not('platform', 'is', null)
-
+    const { data } = await supabase.rpc('get_social_clicks_v2', {
+      p_profile_id: profileId,
+    })
     const counts: Record<string, number> = {}
-    for (const row of data ?? []) {
-      const p = row.platform as string
-      counts[p] = (counts[p] ?? 0) + 1
+    for (const row of (data as RPCSocialRow[]) ?? []) {
+      counts[row.platform] = Number(row.count)
     }
     return counts
   },
 
   async getAdminStats() {
     const [users, published, totalViews, media] = await Promise.all([
-      supabase.from('profiles').select('*', { count: 'exact', head: true }),
-      supabase.from('profiles').select('*', { count: 'exact', head: true }).eq('is_published', true),
+      supabase.from('profiles').select('*',    { count: 'exact', head: true }),
+      supabase.from('profiles').select('*',    { count: 'exact', head: true }).eq('is_published', true),
       supabase.from('analytics_events').select('*', { count: 'exact', head: true }).eq('event_type', 'portfolio_view'),
       supabase.from('media_files').select('*', { count: 'exact', head: true }),
     ])
     return {
-      total_users:         users.count     ?? 0,
-      total_portfolios:    published.count ?? 0,
+      total_users:         users.count      ?? 0,
+      total_portfolios:    published.count  ?? 0,
       total_views:         totalViews.count ?? 0,
-      total_media_uploads: media.count     ?? 0,
+      total_media_uploads: media.count      ?? 0,
     }
   },
 }

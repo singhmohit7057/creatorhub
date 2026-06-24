@@ -13,7 +13,7 @@ import { inquiryService }       from '@/services/inquiryService'
 import { analyticsService }     from '@/services/analyticsService'
 import { Button } from '@/components/common/Button'
 import { SkeletonProfile } from '@/components/common/Skeleton'
-import { APP_URL } from '@/utils/constants'
+import { APP_URL, MAX_PORTFOLIO_MEDIA } from '@/utils/constants'
 import type {
   Profile, SocialLink, MediaFile, PortfolioStats,
   BrandCollaboration, Testimonial, CreatorService,
@@ -52,7 +52,12 @@ export function PublicPortfolioPage() {
           testimonialService.getByProfile(p.id),
           serviceService.getByProfile(p.id),
         ])
-        setSocials(s); setMedia(m); setStats(st)
+        // Cover first, then next items by sort_order — max 6 shown on portfolio
+        const sorted = [...m].sort((a, b) => {
+          if (a.is_featured !== b.is_featured) return a.is_featured ? -1 : 1
+          return a.sort_order - b.sort_order
+        }).slice(0, MAX_PORTFOLIO_MEDIA)
+        setSocials(s); setMedia(sorted); setStats(st)
         setCollabs(c); setTestimonials(t); setServices(sv)
       } catch { setNotFound(true) }
       finally  { setLoading(false) }
@@ -91,6 +96,7 @@ export function PublicPortfolioPage() {
     <>
       <Helmet>
         <title>{p.full_name} — {p.creator_title ?? 'Creator'} | Showkase</title>
+        <link rel="icon" type="image/svg+xml" href="/portfolio.svg" />
         <meta name="description"        content={p.bio ?? `${p.full_name}'s creator portfolio`} />
         <meta property="og:title"       content={`${p.full_name} | Showkase`} />
         <meta property="og:description" content={p.bio ?? ''} />

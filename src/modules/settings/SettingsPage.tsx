@@ -252,7 +252,7 @@ export function SettingsPage() {
     if (debounceRef.current) clearTimeout(debounceRef.current)
     if (slug === profile?.username) { setAvailability('same'); return }
     setAvailability('idle')
-    if (!slug || slug.length < 3) return
+    if (!slug || slug.length < 5) return
     setAvailability('checking')
     debounceRef.current = setTimeout(async () => {
       try {
@@ -269,7 +269,7 @@ export function SettingsPage() {
   async function saveUsername() {
     if (!profile) return
     const slug = usernameVal.trim()
-    if (!slug || (availability !== 'available' && availability !== 'same')) return
+    if (!slug || slug.length < 5 || (availability !== 'available' && availability !== 'same')) return
     if (slug === profile.username && profile.username_claimed) { setUsernameEditing(false); return }
     setUsernameSaving(true)
     try {
@@ -439,7 +439,7 @@ export function SettingsPage() {
                   )}
                 </div>
               </div>
-              <p className="text-xs text-surface-400 mt-2">Only lowercase letters, numbers, and underscores.</p>
+              <p className="text-xs text-surface-400 mt-2">Min 5 characters · lowercase letters, numbers, and underscores only.</p>
               {profile?.username_claimed && (
                 <p className="text-xs text-amber-600 font-medium mt-1">Username is permanent and cannot be changed.</p>
               )}
@@ -507,7 +507,7 @@ export function SettingsPage() {
                 <p className="text-xs text-red-500 font-medium mt-2">✕ This username is already taken.</p>
               )}
               {(availability === 'idle' || availability === 'checking') && (
-                <p className="text-xs text-surface-400 mt-2">Only lowercase letters, numbers, and underscores.</p>
+                <p className="text-xs text-surface-400 mt-2">Min 5 characters · lowercase letters, numbers, and underscores only.</p>
               )}
             </>
           )}

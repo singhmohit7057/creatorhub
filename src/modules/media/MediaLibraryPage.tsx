@@ -1,4 +1,4 @@
-import { useEffect, useState, useCallback, useRef } from 'react'
+import React, { useEffect, useState, useCallback, useRef } from 'react'
 import { Helmet } from 'react-helmet-async'
 import { Trash2, Star, Image as ImageIcon, Video, GripVertical } from 'lucide-react'
 import toast from 'react-hot-toast'
@@ -10,6 +10,7 @@ import { Skeleton } from '@/components/common/Skeleton'
 import { cn, formatBytes } from '@/utils/helpers'
 import {
   MAX_IMAGE_SIZE_MB, MAX_VIDEO_SIZE_MB,
+  MAX_IMAGES_PER_CREATOR, MAX_VIDEOS_PER_CREATOR, MAX_PORTFOLIO_MEDIA,
   ACCEPTED_IMAGE_TYPES, ACCEPTED_VIDEO_TYPES,
 } from '@/utils/constants'
 import type { MediaFile } from '@/types'
@@ -38,10 +39,28 @@ export function MediaLibraryPage() {
 
   async function handleFiles(files: File[]) {
     if (!profile || !user) return
+
+    const imageCount = media.filter(m => m.type === 'image').length
+    const videoCount = media.filter(m => m.type === 'video').length
+
+    const allowed = files.filter(f => {
+      const isVideo = f.type.startsWith('video/')
+      if (isVideo && videoCount >= MAX_VIDEOS_PER_CREATOR) {
+        toast.error(`Max ${MAX_VIDEOS_PER_CREATOR} videos allowed`)
+        return false
+      }
+      if (!isVideo && imageCount >= MAX_IMAGES_PER_CREATOR) {
+        toast.error(`Max ${MAX_IMAGES_PER_CREATOR} images allowed`)
+        return false
+      }
+      return true
+    })
+
+    if (!allowed.length) return
     setUploading(true)
     try {
       const results = await Promise.allSettled(
-        files.map(f => mediaService.upload(profile.id, user.id, f))
+        allowed.map(f => mediaService.upload(profile.id, user.id, f))
       )
       const succeeded = results.filter(r => r.status === 'fulfilled').length
       const failed    = results.filter(r => r.status === 'rejected').length
@@ -104,6 +123,13 @@ export function MediaLibraryPage() {
     finally { savingOrder.current = false }
   }
 
+  const imageCount = media.filter(m => m.type === 'image').length
+  const videoCount = media.filter(m => m.type === 'video').length
+  const atImageLimit = imageCount >= MAX_IMAGES_PER_CREATOR
+  const atVideoLimit = videoCount >= MAX_VIDEOS_PER_CREATOR
+  const uploadsBlocked = atImageLimit && atVideoLimit
+
+  // Portfolio: cover first, then next 5 by sort_order = 6 total shown
   const filtered = tab === 'all' ? media : media.filter(m => m.type === tab)
 
   return (
@@ -116,16 +142,38 @@ export function MediaLibraryPage() {
         </div>
 
         {/* Upload area */}
-        <div className="mb-6">
+        <div className="mb-4">
           <FileUploader
             onFiles={handleFiles}
             multiple
-            disabled={uploading}
+            disabled={uploading || uploadsBlocked}
             accept={{ 'image/*': ACCEPTED_IMAGE_TYPES, 'video/*': ACCEPTED_VIDEO_TYPES }}
             maxSize={Math.max(MAX_IMAGE_SIZE_MB, MAX_VIDEO_SIZE_MB) * 1024 * 1024}
-            label={uploading ? 'Uploading...' : 'Drop images & videos here'}
+            label={uploading ? 'Uploading...' : uploadsBlocked ? 'Upload limit reached' : 'Drop images & videos here'}
             hint={`Images up to ${MAX_IMAGE_SIZE_MB}MB · Videos up to ${MAX_VIDEO_SIZE_MB}MB`}
           />
+        </div>
+
+        {/* Usage counters */}
+        <div className="flex items-center gap-4 mb-6">
+          <div className={cn('flex items-center gap-2 px-3 py-1.5 rounded-xl border text-xs font-medium',
+            atImageLimit ? 'bg-red-50 border-red-200 text-red-600' : 'bg-surface-50 border-surface-200 text-surface-600'
+          )}>
+            <ImageIcon className="w-3.5 h-3.5" />
+            {imageCount}/{MAX_IMAGES_PER_CREATOR} images
+            {atImageLimit && <span className="text-red-500 font-bold">· Full</span>}
+          </div>
+          <div className={cn('flex items-center gap-2 px-3 py-1.5 rounded-xl border text-xs font-medium',
+            atVideoLimit ? 'bg-red-50 border-red-200 text-red-600' : 'bg-surface-50 border-surface-200 text-surface-600'
+          )}>
+            <Video className="w-3.5 h-3.5" />
+            {videoCount}/{MAX_VIDEOS_PER_CREATOR} videos
+            {atVideoLimit && <span className="text-red-500 font-bold">· Full</span>}
+          </div>
+          <div className="flex items-center gap-2 px-3 py-1.5 rounded-xl border border-surface-200 bg-surface-50 text-xs font-medium text-surface-600">
+            <Star className="w-3.5 h-3.5 text-yellow-500" />
+            {Math.min(media.length, MAX_PORTFOLIO_MEDIA)}/{MAX_PORTFOLIO_MEDIA} shown on portfolio
+          </div>
         </div>
 
         {/* Tabs + hint */}
@@ -158,6 +206,7 @@ export function MediaLibraryPage() {
             <span className="flex items-center gap-1">
               <Star className="w-3.5 h-3.5 text-yellow-500 fill-yellow-500" /> = Portfolio cover (shows first)
             </span>
+            <span>First {MAX_PORTFOLIO_MEDIA} items (by order) shown on portfolio</span>
           </div>
         )}
 
@@ -175,8 +224,15 @@ export function MediaLibraryPage() {
         ) : (
           <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3">
             {filtered.map((file, idx) => (
+              <React.Fragment key={file.id}>
+                {tab === 'all' && idx === MAX_PORTFOLIO_MEDIA && (
+                  <div className="col-span-full flex items-center gap-3 py-2">
+                    <div className="flex-1 h-px bg-surface-200" />
+                    <span className="text-xs font-medium text-surface-400 whitespace-nowrap">Not shown on portfolio</span>
+                    <div className="flex-1 h-px bg-surface-200" />
+                  </div>
+                )}
               <div
-                key={file.id}
                 draggable={tab === 'all'}
                 onDragStart={() => onDragStart(file.id)}
                 onDragOver={e => onDragOver(e, file.id)}
@@ -246,6 +302,7 @@ export function MediaLibraryPage() {
                   </div>
                 </div>
               </div>
+              </React.Fragment>
             ))}
           </div>
         )}

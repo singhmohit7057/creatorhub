@@ -72,6 +72,7 @@ export function PublicMediaKitPage() {
     <>
       <Helmet>
         <title>{profile.full_name} — Media Kit | Showkase</title>
+        <link rel="icon" type="image/svg+xml" href="/mediakit.svg" />
         <meta name="description" content={`Media kit for ${profile.full_name}, ${profile.creator_title}`} />
       </Helmet>
 

@@ -90,7 +90,8 @@ export const BUDGET_OPTIONS = [
 
 export const MAX_IMAGE_SIZE_MB = 10
 export const MAX_VIDEO_SIZE_MB = 100
-export const MAX_IMAGES_PER_CREATOR = 50
-export const MAX_VIDEOS_PER_CREATOR = 20
+export const MAX_IMAGES_PER_CREATOR = 7
+export const MAX_VIDEOS_PER_CREATOR = 2
+export const MAX_PORTFOLIO_MEDIA    = 6
 export const ACCEPTED_IMAGE_TYPES = ['image/jpeg', 'image/png', 'image/webp', 'image/gif']
 export const ACCEPTED_VIDEO_TYPES = ['video/mp4', 'video/webm', 'video/mov', 'video/quicktime']
