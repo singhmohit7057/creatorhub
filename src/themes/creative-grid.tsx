@@ -7,7 +7,7 @@ import { Avatar } from '@/components/common/Avatar'
 import { Input, Textarea, Select } from '@/components/common/Input'
 import { BUDGET_OPTIONS, CREATOR_CATEGORIES, SERVICES } from '@/utils/constants'
 import { formatNumber, cn } from '@/utils/helpers'
-import { SOCIAL_COLORS, SOCIAL_TEXT, SOCIAL_ICONS, inquirySchema, type InquiryFormData, type ThemeProps, TopBar } from './_shared'
+import { SOCIAL_COLORS, SOCIAL_TEXT, SOCIAL_ICONS, inquirySchema, type InquiryFormData, type ThemeProps, TopBar, isYTStats, getStatRows } from './_shared'
 
 export function CreativeGridTheme({ profile: p, socials, media, stats, collabs, testimonials, services, onInquiry, onSocialClick }: ThemeProps) {
   const [submitted, setSubmitted] = useState(false)
@@ -98,22 +98,17 @@ export function CreativeGridTheme({ profile: p, socials, media, stats, collabs, 
         )}
 
         {/* Body */}
-        <div className="px-5 pb-20 space-y-14 mt-8">
+        <div className="px-5 pb-6 space-y-14 mt-8">
 
           {/* Stats — big number row */}
-          {stats && (stats.followers || stats.monthly_reach || stats.avg_views || stats.engagement_rate) && (
+          {stats && (isYTStats(stats) ? (stats.yt_followers || stats.yt_monthly_reach || stats.yt_avg_views || stats.yt_engagement_rate) : (stats.followers || stats.monthly_reach || stats.avg_views || stats.engagement_rate)) && (
             <section>
               <div className="flex items-baseline justify-between mb-4">
                 <h2 className="text-[10px] font-black tracking-[0.2em] uppercase text-gray-400">By The Numbers</h2>
                 <div className="h-px flex-1 bg-gray-200 mx-3 mt-1" />
               </div>
               <div className="grid grid-cols-2 gap-4">
-                {[
-                  { label: 'Followers',     value: stats.followers,       suffix: '',  accent: 'bg-black' },
-                  { label: 'Monthly Reach', value: stats.monthly_reach,   suffix: '',  accent: 'bg-gray-800' },
-                  { label: 'Avg. Views',    value: stats.avg_views,       suffix: '',  accent: 'bg-gray-700' },
-                  { label: 'Engagement',    value: stats.engagement_rate, suffix: '%', accent: 'bg-gray-600' },
-                ].filter(s => s.value).map(s => (
+                {getStatRows(stats).map((s, i) => ({ ...s, accent: ['bg-black','bg-gray-800','bg-gray-700','bg-gray-600'][i] })).filter(s => s.value).map(s => (
                   <div key={s.label} className="group">
                     <p className="text-3xl font-black tracking-tighter text-gray-900 leading-none">
                       {formatNumber(s.value!)}{s.suffix}
@@ -306,7 +301,7 @@ export function CreativeGridTheme({ profile: p, socials, media, stats, collabs, 
 
           {/* Footer */}
           <div className="text-center pt-2 border-t border-gray-100">
-            <Link to="/" className="text-[10px] text-gray-300 hover:text-black transition-colors">Powered by Showkase →</Link>
+            <Link to="/" className="text-[10px] text-gray-300 hover:text-black transition-colors">Made with Showkase — Create yours free →</Link>
           </div>
         </div>
       </div>

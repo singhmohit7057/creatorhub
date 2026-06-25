@@ -48,7 +48,29 @@ export const collaborationService = {
     return data as BrandCollaboration
   },
 
-  async update(id: string, updates: Partial<BrandCollaboration>) {
+  async update(
+    id: string,
+    userId: string,
+    updates: Partial<BrandCollaboration>,
+    logoFile?: File,
+    coverFile?: File,
+  ) {
+    if (logoFile) {
+      const ext  = logoFile.name.split('.').pop()
+      const path = `${userId}/logo_${Date.now()}.${ext}`
+      const { error: upErr } = await supabase.storage.from('logos').upload(path, logoFile)
+      if (upErr) throw upErr
+      const { data } = supabase.storage.from('logos').getPublicUrl(path)
+      updates.brand_logo_url = data.publicUrl
+    }
+    if (coverFile) {
+      const ext  = coverFile.name.split('.').pop()
+      const path = `${userId}/cover_${Date.now()}.${ext}`
+      const { error: upErr } = await supabase.storage.from('logos').upload(path, coverFile)
+      if (upErr) throw upErr
+      const { data } = supabase.storage.from('logos').getPublicUrl(path)
+      updates.cover_image_url = data.publicUrl
+    }
     const { data, error } = await supabase
       .from('brand_collaborations')
       .update(updates)

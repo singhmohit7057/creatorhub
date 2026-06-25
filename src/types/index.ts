@@ -20,6 +20,9 @@ export type PortfolioTemplate = 'minimal' | 'modern-dark' | 'fashion-premium' | 
 export type ServiceType =
   | 'ugc_videos' | 'product_photography' | 'reels' | 'shorts'
   | 'product_reviews' | 'voice_overs' | 'brand_campaigns' | 'social_media_content'
+  | 'youtube_video' | 'youtube_integration'
+  | 'instagram_post' | 'instagram_stories'
+  | 'live_streaming' | 'brand_ambassador' | 'affiliate_marketing'
 
 export type MediaType = 'image' | 'video'
 
@@ -64,10 +67,18 @@ export interface Profile {
 export interface PortfolioStats {
   id: string
   profile_id: string
-  followers: number | null
-  monthly_reach: number | null
-  avg_views: number | null
-  engagement_rate: number | null
+  // Instagram
+  followers:        number | null
+  monthly_reach:    number | null
+  avg_views:        number | null
+  engagement_rate:  number | null
+  // YouTube
+  yt_followers:       number | null
+  yt_monthly_reach:   number | null
+  yt_avg_views:       number | null
+  yt_engagement_rate: number | null
+  // Which platform to show on portfolio
+  active_platform: 'instagram' | 'youtube'
   collaborations_count: number | null
   updated_at: string
 }

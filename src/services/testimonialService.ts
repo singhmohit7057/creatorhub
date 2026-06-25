@@ -31,7 +31,15 @@ export const testimonialService = {
     return data as Testimonial
   },
 
-  async update(id: string, updates: Partial<Testimonial>) {
+  async update(id: string, userId: string, updates: Partial<Testimonial>, avatarFile?: File) {
+    if (avatarFile) {
+      const ext  = avatarFile.name.split('.').pop()
+      const path = `${userId}/${Date.now()}.${ext}`
+      const { error: upErr } = await supabase.storage.from('testimonials').upload(path, avatarFile)
+      if (upErr) throw upErr
+      const { data } = supabase.storage.from('testimonials').getPublicUrl(path)
+      updates.avatar_url = data.publicUrl
+    }
     const { data, error } = await supabase
       .from('testimonials')
       .update(updates)

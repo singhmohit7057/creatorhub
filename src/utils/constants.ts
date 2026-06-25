@@ -43,15 +43,22 @@ export const PORTFOLIO_TEMPLATES: {
   { value: 'creative-grid',    label: 'Creative Grid',   description: 'Gallery-first, visual storytelling', preview_color: '#fafafa' },
 ]
 
-export const SERVICES: { value: ServiceType; label: string; icon: string }[] = [
-  { value: 'ugc_videos',          label: 'UGC Videos',            icon: '🎬' },
-  { value: 'product_photography', label: 'Product Photography',   icon: '📸' },
-  { value: 'reels',               label: 'Reels',                 icon: '🎞️' },
-  { value: 'shorts',              label: 'Shorts',                icon: '▶️' },
-  { value: 'product_reviews',     label: 'Product Reviews',       icon: '⭐' },
-  { value: 'voice_overs',         label: 'Voice Overs',           icon: '🎙️' },
-  { value: 'brand_campaigns',     label: 'Brand Campaigns',       icon: '📢' },
-  { value: 'social_media_content',label: 'Social Media Content',  icon: '📱' },
+export const SERVICES: { value: ServiceType; label: string; icon: string; platform?: 'instagram' | 'youtube' | 'both' }[] = [
+  { value: 'ugc_videos',           label: 'UGC Videos',            icon: '🎬' },
+  { value: 'product_photography',  label: 'Product Photography',   icon: '📸' },
+  { value: 'reels',                label: 'Reels',                 icon: '🎞️',  platform: 'instagram' },
+  { value: 'shorts',               label: 'YouTube Shorts',        icon: '⚡',   platform: 'youtube' },
+  { value: 'product_reviews',      label: 'Product Reviews',       icon: '⭐' },
+  { value: 'voice_overs',          label: 'Voice Overs',           icon: '🎙️' },
+  { value: 'brand_campaigns',      label: 'Brand Campaigns',       icon: '📢' },
+  { value: 'social_media_content', label: 'Social Media Content',  icon: '📱' },
+  { value: 'youtube_video',        label: 'YouTube Video',         icon: '▶️',   platform: 'youtube' },
+  { value: 'youtube_integration',  label: 'YouTube Integration',   icon: '🔗',   platform: 'youtube' },
+  { value: 'instagram_post',       label: 'Instagram Post',        icon: '🖼️',   platform: 'instagram' },
+  { value: 'instagram_stories',    label: 'Instagram Stories',     icon: '⭕',   platform: 'instagram' },
+  { value: 'live_streaming',       label: 'Live Streaming',        icon: '🔴',   platform: 'both' },
+  { value: 'brand_ambassador',     label: 'Brand Ambassador',      icon: '🤝',   platform: 'both' },
+  { value: 'affiliate_marketing',  label: 'Affiliate Marketing',   icon: '💸',   platform: 'both' },
 ]
 
 export const SOCIAL_PLATFORMS: {

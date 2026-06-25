@@ -64,11 +64,11 @@ export function TestimonialsPage() {
     if (!profile || !user) return
     try {
       if (editing) {
-        const updated = await testimonialService.update(editing.id, {
+        const updated = await testimonialService.update(editing.id, user.id, {
           client_name: data.client_name,
           company:     data.company ?? null,
           review:      data.review,
-        })
+        }, avatarFile ?? undefined)
         setItems(prev => prev.map(t => t.id === editing.id ? updated : t))
         toast.success('Testimonial updated!')
       } else {

@@ -3,7 +3,7 @@ import { Link, useNavigate } from 'react-router-dom'
 import { Helmet } from 'react-helmet-async'
 import {
   ArrowRight, Sparkles, Briefcase, BarChart2, Globe,
-  CheckCircle, Star, Play, TrendingUp, Users, Eye,
+  CheckCircle, Star, TrendingUp, Users, Eye,
   Instagram, Youtube, Zap, Shield, Heart, Camera,
 } from 'lucide-react'
 
@@ -97,13 +97,13 @@ function TestimonialCard({ name, niche, quote, initials, from, to }: {
         ))}
       </div>
       <p className="text-slate-600 text-sm leading-relaxed mb-4">"{quote}"</p>
-      <div className="flex items-center gap-2.5">
-        <div className={`w-8 h-8 rounded-xl bg-gradient-to-br ${from} ${to} flex items-center justify-center text-white font-bold text-xs`}>
+      <div className="flex items-center gap-3 pt-3 border-t border-slate-100">
+        <div className={`w-9 h-9 rounded-full bg-gradient-to-br ${from} ${to} flex items-center justify-center text-white font-bold text-xs shrink-0`}>
           {initials}
         </div>
         <div>
-          <p className="text-sm font-semibold text-slate-900">{name}</p>
-          <p className="text-xs text-slate-400">{niche}</p>
+          <p className="text-sm font-semibold text-slate-900 m-0 leading-tight text-left">{name}</p>
+          <p className="text-xs text-slate-400 m-0 leading-tight text-left">{niche}</p>
         </div>
       </div>
     </div>
@@ -111,8 +111,10 @@ function TestimonialCard({ name, niche, quote, initials, from, to }: {
 }
 
 const categories = [
-  'Fashion', 'Beauty', 'Lifestyle', 'Travel', 'Food',
-  'Fitness', 'Tech', 'Gaming', 'Education', 'Finance', 'Parenting', 'Pets',
+  'Fashion', 'Beauty', 'Lifestyle', 'Travel', 'Food', 'Fitness', 'Tech', 'Gaming',
+  'Education', 'Finance', 'Parenting', 'Music', 'Entertainment', 'Sports', 'Art',
+  'Photography', 'Comedy', 'DIY', 'Pets', 'Health', 'Business', 'Automotive', 'Nature',
+  'Motivation', 'Other',
 ]
 
 const features = [
@@ -356,17 +358,14 @@ export function HomePage() {
             See what brands see<br />when they find you on Showkase
           </h2>
 
-          <div className="relative bg-gradient-to-br from-violet-50 via-pink-50 to-amber-50 border border-slate-100 rounded-3xl aspect-video flex items-center justify-center shadow-[0_8px_40px_-8px_rgba(0,0,0,0.1)] overflow-hidden">
-            <div className="absolute inset-0 opacity-30">
-              <div className="absolute top-8 left-12 w-32 h-32 bg-violet-200 rounded-full blur-3xl" />
-              <div className="absolute bottom-8 right-12 w-32 h-32 bg-pink-200 rounded-full blur-3xl" />
-            </div>
-            <div className="relative text-center">
-              <div className="w-14 h-14 rounded-full bg-white border border-slate-100 shadow-md flex items-center justify-center mx-auto mb-3 hover:shadow-lg transition-shadow cursor-pointer">
-                <Play className="w-5 h-5 text-violet-500 fill-violet-500 ml-0.5" />
-              </div>
-              <p className="text-slate-400 text-sm">Demo coming soon</p>
-            </div>
+          <div className="relative rounded-3xl aspect-video shadow-[0_8px_40px_-8px_rgba(0,0,0,0.1)] overflow-hidden">
+            <iframe
+              src="https://www.youtube.com/embed/sFWFp8v_cNw"
+              title="Showkase Demo"
+              allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+              allowFullScreen
+              className="w-full h-full"
+            />
           </div>
         </div>
       </section>

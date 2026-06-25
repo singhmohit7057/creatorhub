@@ -8,7 +8,7 @@ import { Input, Textarea, Select } from '@/components/common/Input'
 import { Button } from '@/components/common/Button'
 import { BUDGET_OPTIONS, CREATOR_CATEGORIES, SERVICES } from '@/utils/constants'
 import { formatNumber, cn } from '@/utils/helpers'
-import { SOCIAL_COLORS, SOCIAL_TEXT, SOCIAL_ICONS, inquirySchema, type InquiryFormData, type ThemeProps, TopBar } from './_shared'
+import { SOCIAL_COLORS, SOCIAL_TEXT, SOCIAL_ICONS, inquirySchema, type InquiryFormData, type ThemeProps, TopBar, isYTStats, getStatRows } from './_shared'
 
 const t = {
   page:        'bg-[#fdf6f9] text-gray-900',
@@ -30,6 +30,8 @@ const t = {
 export function FashionPremiumTheme({ profile: p, socials, media, stats, collabs, testimonials, services, onInquiry, onSocialClick }: ThemeProps) {
   const [submitted, setSubmitted] = useState(false)
   const [showAllCollabs, setShowAllCollabs] = useState(false)
+  const [lightboxIndex, setLightboxIndex] = useState<number | null>(null)
+  const lightboxImages = media
   const { register, handleSubmit, formState: { errors, isSubmitting }, reset } = useForm<InquiryFormData>({
     resolver: zodResolver(inquirySchema),
   })
@@ -55,7 +57,7 @@ export function FashionPremiumTheme({ profile: p, socials, media, stats, collabs
               <img src={p.cover_url} alt="" className="w-full h-full object-cover" />
             </div>
           )}
-          <div className="relative max-w-4xl mx-auto px-6 pt-8 pb-12 text-center">
+          <div className="relative max-w-4xl mx-auto px-6 pt-8 pb-6 text-center">
             <Avatar src={p.avatar_url} name={p.full_name} size="3xl"
               className="mx-auto border-4 border-pink-400/50 shadow-2xl mb-6" />
             <h1 className="text-4xl font-black tracking-tight mb-2">{p.full_name}</h1>
@@ -105,7 +107,7 @@ export function FashionPremiumTheme({ profile: p, socials, media, stats, collabs
         </div>
 
         {/* Body */}
-        <div className="max-w-5xl mx-auto px-4 pb-20 space-y-14 mt-6">
+        <div className="max-w-5xl mx-auto px-4 pb-6 space-y-14 mt-2">
 
           {/* Bio */}
           {p.bio && (
@@ -113,16 +115,11 @@ export function FashionPremiumTheme({ profile: p, socials, media, stats, collabs
           )}
 
           {/* Stats */}
-          {stats && (stats.followers || stats.monthly_reach || stats.avg_views || stats.engagement_rate) && (
+          {stats && (isYTStats(stats) ? (stats.yt_followers || stats.yt_monthly_reach || stats.yt_avg_views || stats.yt_engagement_rate) : (stats.followers || stats.monthly_reach || stats.avg_views || stats.engagement_rate)) && (
             <section>
               <h2 className="text-2xl font-bold mb-6 text-center tracking-widest uppercase text-gray-900">By The Numbers</h2>
               <div className="grid grid-cols-2 gap-3">
-                {[
-                  { label: 'Followers',     value: stats.followers,       suffix: '',  icon: '👥' },
-                  { label: 'Monthly Reach', value: stats.monthly_reach,   suffix: '',  icon: '📡' },
-                  { label: 'Avg. Views',    value: stats.avg_views,       suffix: '',  icon: '▶️'  },
-                  { label: 'Engagement',    value: stats.engagement_rate, suffix: '%', icon: '🔥' },
-                ].filter(s => s.value).map(s => (
+                {getStatRows(stats).filter(s => s.value).map(s => (
                   <div
                     key={s.label}
                     className={cn('rounded-2xl border p-4 flex flex-col gap-1 relative overflow-hidden', t.card, t.cardBorder)}
@@ -161,12 +158,34 @@ export function FashionPremiumTheme({ profile: p, socials, media, stats, collabs
           {media.length > 0 && (
             <section>
               <h2 className="text-2xl font-bold mb-6 text-center tracking-widest uppercase text-gray-900">Portfolio</h2>
-              <div className="columns-2 sm:columns-3 gap-3 space-y-3">
-                {media.map(file => (
-                  <div key={file.id} className="break-inside-avoid rounded-xl overflow-hidden shadow-sm">
+              <div className="grid grid-cols-3 gap-2">
+                {/* First item: large, spans 2 cols and 2 rows */}
+                {media[0] && (
+                  <div className="col-span-2 row-span-2 rounded-2xl overflow-hidden aspect-square cursor-zoom-in"
+                    onClick={() => setLightboxIndex(0)}>
+                    {media[0].type === 'image'
+                      ? <img src={media[0].url} alt={media[0].title ?? ''} className="w-full h-full object-cover hover:scale-105 transition-transform duration-300" loading="lazy" />
+                      : <video src={media[0].url} className="w-full h-full object-cover cursor-pointer" onClick={() => setLightboxIndex(0)} />
+                    }
+                  </div>
+                )}
+                {/* Items 2 & 3: small, stack in right column */}
+                {media.slice(1, 3).map((file, i) => (
+                  <div key={file.id} className="rounded-2xl overflow-hidden aspect-square cursor-zoom-in"
+                    onClick={() => setLightboxIndex(i + 1)}>
                     {file.type === 'image'
-                      ? <img src={file.url} alt={file.title ?? ''} className="w-full object-cover" loading="lazy" />
-                      : <video src={file.url} controls className="w-full rounded-xl" />
+                      ? <img src={file.url} alt={file.title ?? ''} className="w-full h-full object-cover hover:scale-105 transition-transform duration-300" loading="lazy" />
+                      : <video src={file.url} className="w-full h-full object-cover cursor-pointer" />
+                    }
+                  </div>
+                ))}
+                {/* Items 4+ : 3-col equal row */}
+                {media.slice(3).map((file, i) => (
+                  <div key={file.id} className="rounded-2xl overflow-hidden aspect-square cursor-zoom-in"
+                    onClick={() => setLightboxIndex(i + 3)}>
+                    {file.type === 'image'
+                      ? <img src={file.url} alt={file.title ?? ''} className="w-full h-full object-cover hover:scale-105 transition-transform duration-300" loading="lazy" />
+                      : <video src={file.url} className="w-full h-full object-cover cursor-pointer" />
                     }
                   </div>
                 ))}
@@ -180,8 +199,8 @@ export function FashionPremiumTheme({ profile: p, socials, media, stats, collabs
               <h2 className="text-2xl font-bold mb-6 text-center tracking-widest uppercase text-gray-900">Brand Collaborations</h2>
               <div className="flex gap-3 overflow-x-auto pb-2 -mx-4 px-4 snap-x snap-mandatory scrollbar-none">
                 {(showAllCollabs ? collabs : collabs.slice(0, 6)).map(c => (
-                  <div key={c.id} className={cn('rounded-2xl border overflow-hidden shrink-0 snap-start shadow-sm', t.card, t.cardBorder)} style={{ width: '160px' }}>
-                    <div className="w-full overflow-hidden relative" style={{ aspectRatio: '9/16' }}>
+                  <div key={c.id} className={cn('rounded-2xl border overflow-hidden shrink-0 snap-start shadow-sm', t.card, t.cardBorder)} style={{ width: '124px' }}>
+                    <div className="w-full overflow-hidden relative" style={{ aspectRatio: '9/13' }}>
                       {c.cover_image_url ? (
                         <img src={c.cover_image_url} alt={c.brand_name} className="w-full h-full object-cover" />
                       ) : (
@@ -206,11 +225,11 @@ export function FashionPremiumTheme({ profile: p, socials, media, stats, collabs
                         </a>
                       )}
                     </div>
-                    <div className="p-3 flex items-center gap-2">
-                      {c.brand_logo_url && <img src={c.brand_logo_url} alt={c.brand_name} className="w-7 h-7 rounded-full object-cover shrink-0" />}
+                    <div className="p-2 flex items-center gap-1.5">
+                      {c.brand_logo_url && <img src={c.brand_logo_url} alt={c.brand_name} className="w-5 h-5 rounded-full object-cover shrink-0" />}
                       <div className="min-w-0">
-                        <p className={cn('text-xs font-bold leading-tight', t.text)}>{c.brand_name}</p>
-                        {c.campaign_results && <p className="text-[10px] text-emerald-500 font-medium mt-0.5">{c.campaign_results}</p>}
+                        <p className={cn('text-[10px] font-bold leading-tight truncate', t.text)}>{c.brand_name}</p>
+                        {c.campaign_results && <p className="text-[9px] text-emerald-500 font-medium mt-0.5 truncate">{c.campaign_results}</p>}
                       </div>
                     </div>
                   </div>
@@ -219,7 +238,7 @@ export function FashionPremiumTheme({ profile: p, socials, media, stats, collabs
                 {!showAllCollabs && collabs.length > 6 && (
                   <button onClick={() => setShowAllCollabs(true)}
                     className={cn('rounded-2xl border shrink-0 snap-start flex flex-col items-center justify-center gap-1 transition-colors hover:bg-pink-50', t.card, t.cardBorder)}
-                    style={{ width: '160px', aspectRatio: '9/16' }}>
+                    style={{ width: '124px', aspectRatio: '9/16' }}>
                     <span className="text-2xl font-black text-gray-900">+{collabs.length - 6}</span>
                     <span className="text-[10px] text-pink-500 font-semibold">more brands</span>
                   </button>
@@ -279,10 +298,51 @@ export function FashionPremiumTheme({ profile: p, socials, media, stats, collabs
 
           {/* Footer */}
           <div className={cn('text-center pt-2 border-t', t.divider)}>
-            <Link to="/" className={cn('text-xs hover:text-pink-500 transition-colors', t.muted)}>Powered by Showkase →</Link>
+            <Link to="/" className={cn('text-xs hover:text-pink-500 transition-colors', t.muted)}>Made with Showkase — Create yours free →</Link>
           </div>
         </div>
       </div>
+
+      {/* Lightbox */}
+      {lightboxIndex !== null && lightboxImages[lightboxIndex] && (
+        <div
+          className="fixed inset-0 z-50 bg-black/70 flex items-center justify-center p-6"
+          onClick={() => setLightboxIndex(null)}
+        >
+          <div
+            className="relative bg-white rounded-2xl overflow-hidden shadow-2xl max-w-sm w-full"
+            onClick={e => e.stopPropagation()}
+          >
+            {lightboxImages[lightboxIndex].type === 'image'
+              ? <img src={lightboxImages[lightboxIndex].url} alt="" className="w-full object-contain max-h-[70vh]" />
+              : <video src={lightboxImages[lightboxIndex].url} controls autoPlay className="w-full max-h-[70vh]" />
+            }
+            {/* Close */}
+            <button
+              className="absolute top-2 right-2 w-8 h-8 rounded-full bg-black/50 flex items-center justify-center text-white text-sm hover:bg-black/70 transition-colors"
+              onClick={() => setLightboxIndex(null)}
+            >✕</button>
+            {/* Prev */}
+            {lightboxIndex > 0 && (
+              <button
+                className="absolute left-2 top-1/2 -translate-y-1/2 w-9 h-9 rounded-full bg-black/50 flex items-center justify-center text-white hover:bg-black/70 transition-colors text-lg"
+                onClick={() => setLightboxIndex(i => i! - 1)}
+              >‹</button>
+            )}
+            {/* Next */}
+            {lightboxIndex < lightboxImages.length - 1 && (
+              <button
+                className="absolute right-2 top-1/2 -translate-y-1/2 w-9 h-9 rounded-full bg-black/50 flex items-center justify-center text-white hover:bg-black/70 transition-colors text-lg"
+                onClick={() => setLightboxIndex(i => i! + 1)}
+              >›</button>
+            )}
+            {/* Counter */}
+            <div className="absolute bottom-2 left-1/2 -translate-x-1/2 text-[10px] text-white bg-black/40 px-2 py-0.5 rounded-full">
+              {lightboxIndex + 1} / {lightboxImages.length}
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }

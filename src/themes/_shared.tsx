@@ -75,6 +75,20 @@ export const inquirySchema = z.object({
 })
 export type InquiryFormData = z.infer<typeof inquirySchema>
 
+export function isYTStats(s: PortfolioStats) {
+  return s.active_platform === 'youtube'
+}
+
+export function getStatRows(s: PortfolioStats) {
+  const isYT = s.active_platform === 'youtube'
+  return [
+    { label: isYT ? 'Subscribers'   : 'Followers',     value: isYT ? s.yt_followers       : s.followers,       suffix: '',  icon: '👥' },
+    { label: isYT ? 'Monthly Views'  : 'Monthly Reach', value: isYT ? s.yt_monthly_reach   : s.monthly_reach,   suffix: '',  icon: '📡' },
+    { label: 'Avg. Views',                              value: isYT ? s.yt_avg_views       : s.avg_views,       suffix: '',  icon: '▶' },
+    { label: 'Engagement',                              value: isYT ? s.yt_engagement_rate : s.engagement_rate, suffix: '%', icon: '🔥' },
+  ]
+}
+
 export type ThemeProps = {
   profile:      Profile
   socials:      SocialLink[]

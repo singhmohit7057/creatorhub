@@ -7,7 +7,7 @@ import { Avatar } from '@/components/common/Avatar'
 import { Input, Textarea, Select } from '@/components/common/Input'
 import { BUDGET_OPTIONS, CREATOR_CATEGORIES, SERVICES } from '@/utils/constants'
 import { formatNumber, cn } from '@/utils/helpers'
-import { SOCIAL_COLORS, SOCIAL_TEXT, SOCIAL_ICONS, inquirySchema, type InquiryFormData, type ThemeProps, TopBar } from './_shared'
+import { SOCIAL_COLORS, SOCIAL_TEXT, SOCIAL_ICONS, inquirySchema, type InquiryFormData, type ThemeProps, TopBar, isYTStats, getStatRows } from './_shared'
 
 const CYAN = '#00f5d4'
 
@@ -100,22 +100,17 @@ export function ModernDarkTheme({ profile: p, socials, media, stats, collabs, te
         <div className="mx-5 border-t border-slate-800" />
 
         {/* Body */}
-        <div className="px-5 pb-20 space-y-12 mt-8">
+        <div className="px-5 pb-6 space-y-12 mt-8">
 
           {/* Stats */}
-          {stats && (stats.followers || stats.monthly_reach || stats.avg_views || stats.engagement_rate) && (
+          {stats && (isYTStats(stats) ? (stats.yt_followers || stats.yt_monthly_reach || stats.yt_avg_views || stats.yt_engagement_rate) : (stats.followers || stats.monthly_reach || stats.avg_views || stats.engagement_rate)) && (
             <section>
               <div className="flex items-center gap-2 mb-5">
                 <span className="text-slate-600 text-xs">{'// '}</span>
                 <h2 className="text-xs font-bold tracking-widest uppercase" style={{ color: CYAN }}>STATS</h2>
               </div>
               <div className="grid grid-cols-2 gap-px bg-slate-800 rounded-xl overflow-hidden border border-slate-800">
-                {[
-                  { label: 'Followers',     value: stats.followers,       suffix: '',  icon: '👥' },
-                  { label: 'Monthly Reach', value: stats.monthly_reach,   suffix: '',  icon: '📡' },
-                  { label: 'Avg. Views',    value: stats.avg_views,       suffix: '',  icon: '▶️'  },
-                  { label: 'Engagement',    value: stats.engagement_rate, suffix: '%', icon: '🔥' },
-                ].filter(s => s.value).map((s, i) => (
+                {getStatRows(stats).filter(s => s.value).map((s, i) => (
                   <div key={s.label} className={cn('bg-[#0d1220] p-4', i === 0 && 'rounded-tl-xl', i === 1 && 'rounded-tr-xl',
                     i === 2 && 'rounded-bl-xl', i === 3 && 'rounded-br-xl')}>
                     <p className="text-2xl font-bold tracking-tight" style={{ color: CYAN }}>
@@ -287,7 +282,7 @@ export function ModernDarkTheme({ profile: p, socials, media, stats, collabs, te
           {/* Footer */}
           <div className="text-center pt-2 border-t border-slate-800">
             <Link to="/" className="text-[10px] text-slate-700 hover:text-[#00f5d4] transition-colors">
-              powered by showkase →
+              Made with Showkase — Create yours free →
             </Link>
           </div>
         </div>

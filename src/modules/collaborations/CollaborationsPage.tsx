@@ -4,7 +4,7 @@ import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
 import { Helmet } from 'react-helmet-async'
 import toast from 'react-hot-toast'
-import { Plus, Trash2, Briefcase, Pencil, Calendar, ExternalLink, ImageIcon, Film, BookImage, Clapperboard, Upload, X as XIcon, Star, Youtube, FileText, Mic, LayoutGrid, Scissors, Globe } from 'lucide-react'
+import { Plus, Trash2, Briefcase, Pencil, Calendar, ExternalLink, Clapperboard, Upload, X as XIcon, Star } from 'lucide-react'
 import { useAuth } from '@/contexts/AuthContext'
 import { collaborationService } from '@/services/collaborationService'
 import { statsService }         from '@/services/statsService'
@@ -33,20 +33,24 @@ const statsSchema = z.object({
   monthly_reach:        z.coerce.number().min(0).optional(),
   avg_views:            z.coerce.number().min(0).optional(),
   engagement_rate:      z.coerce.number().min(0).max(100).optional(),
-  collaborations_count: z.coerce.number().min(0).optional(),
+  yt_followers:         z.coerce.number().min(0).optional(),
+  yt_monthly_reach:     z.coerce.number().min(0).optional(),
+  yt_avg_views:         z.coerce.number().min(0).optional(),
+  yt_engagement_rate:   z.coerce.number().min(0).max(100).optional(),
+  active_platform:      z.enum(['instagram', 'youtube']),
 })
 type StatsForm = z.infer<typeof statsSchema>
 
-const CONTENT_TYPES: { value: CollabContentType; label: string; icon: React.ReactNode }[] = [
-  { value: 'post',    label: 'Post',    icon: <ImageIcon className="w-4 h-4" /> },
-  { value: 'reel',    label: 'Reel',    icon: <Film className="w-4 h-4" /> },
-  { value: 'story',   label: 'Story',   icon: <BookImage className="w-4 h-4" /> },
-  { value: 'video',   label: 'Video',   icon: <Youtube className="w-4 h-4" /> },
-  { value: 'shorts',  label: 'Shorts',  icon: <Scissors className="w-4 h-4" /> },
-  { value: 'website', label: 'Website', icon: <Globe className="w-4 h-4" /> },
-  { value: 'blog',    label: 'Blog',    icon: <FileText className="w-4 h-4" /> },
-  { value: 'podcast', label: 'Podcast', icon: <Mic className="w-4 h-4" /> },
-  { value: 'other',   label: 'Other',   icon: <LayoutGrid className="w-4 h-4" /> },
+const CONTENT_TYPES: { value: CollabContentType; label: string; icon: string }[] = [
+  { value: 'post',    label: 'Post',    icon: '🖼️' },
+  { value: 'reel',    label: 'Reel',    icon: '🎞️' },
+  { value: 'story',   label: 'Story',   icon: '⭕' },
+  { value: 'video',   label: 'Video',   icon: '▶️' },
+  { value: 'shorts',  label: 'Shorts',  icon: '⚡' },
+  { value: 'website', label: 'Website', icon: '🌐' },
+  { value: 'blog',    label: 'Blog',    icon: '📝' },
+  { value: 'podcast', label: 'Podcast', icon: '🎙️' },
+  { value: 'other',   label: 'Other',   icon: '📦' },
 ]
 
 function ImageUpload({
@@ -171,11 +175,15 @@ export function CollaborationsPage() {
       .then(s => {
         setStats(s)
         statsForm.reset({
-          followers:            s.followers            ?? undefined,
-          monthly_reach:        s.monthly_reach        ?? undefined,
-          avg_views:            s.avg_views            ?? undefined,
-          engagement_rate:      s.engagement_rate      ?? undefined,
-          collaborations_count: s.collaborations_count ?? undefined,
+          followers:          s.followers          ?? undefined,
+          monthly_reach:      s.monthly_reach      ?? undefined,
+          avg_views:          s.avg_views          ?? undefined,
+          engagement_rate:    s.engagement_rate    ?? undefined,
+          yt_followers:       s.yt_followers       ?? undefined,
+          yt_monthly_reach:   s.yt_monthly_reach   ?? undefined,
+          yt_avg_views:       s.yt_avg_views       ?? undefined,
+          yt_engagement_rate: s.yt_engagement_rate ?? undefined,
+          active_platform:    s.active_platform    ?? 'instagram',
         })
       })
       .catch(() => {})
@@ -223,10 +231,10 @@ export function CollaborationsPage() {
       : contentType
     try {
       if (editing) {
-        const updated = await collaborationService.update(editing.id, {
+        const updated = await collaborationService.update(editing.id, user.id, {
           brand_name: data.brand_name, content_type: finalContentType, post_url: data.post_url || null,
           project_description: data.project_description ?? null, campaign_results: data.campaign_results ?? null, collaboration_date,
-        })
+        }, logoFile ?? undefined, coverFile ?? undefined)
         setCollabs(prev => prev.map(c => c.id === editing.id ? updated : c))
         toast.success('Collaboration updated!')
       } else {
@@ -423,18 +431,59 @@ export function CollaborationsPage() {
             <Skeleton className="h-64 rounded-2xl" />
           ) : (
             <form onSubmit={statsForm.handleSubmit(saveStats)} className="space-y-4">
-              <div className="bg-white rounded-2xl border border-surface-200 p-6 space-y-4">
-                <p className="text-sm text-brand-600 bg-brand-50 border border-brand-100 rounded-xl px-3 py-2">
-                  These stats are shown on your public portfolio to give brands a quick overview.
-                </p>
-                <div className="grid grid-cols-2 gap-4">
-                  <Input label="Total Followers"      type="number" min="0" placeholder="0" {...statsForm.register('followers')} />
-                  <Input label="Monthly Reach"        type="number" min="0" placeholder="0" {...statsForm.register('monthly_reach')} />
-                  <Input label="Avg. Video Views"     type="number" min="0" placeholder="0" {...statsForm.register('avg_views')} />
-                  <Input label="Engagement Rate (%)"  type="number" min="0" max="100" step="0.01" placeholder="0.00" {...statsForm.register('engagement_rate')} />
-                  <Input label="Collaborations Done"  type="number" min="0" placeholder="0" {...statsForm.register('collaborations_count')} />
+              {/* Platform toggle */}
+              <div className="bg-white rounded-2xl border border-surface-200 p-4 flex items-center justify-between gap-4">
+                <div>
+                  <p className="text-sm font-semibold text-surface-900">Show on portfolio</p>
+                  <p className="text-xs text-surface-400 mt-0.5">Choose which platform stats appear on your public profile</p>
+                </div>
+                <div className="flex gap-2">
+                  {(['instagram', 'youtube'] as const).map(p => (
+                    <button
+                      key={p}
+                      type="button"
+                      onClick={() => statsForm.setValue('active_platform', p)}
+                      className={cn(
+                        'px-4 py-1.5 rounded-xl text-sm font-medium border transition-all',
+                        statsForm.watch('active_platform') === p
+                          ? 'bg-brand-500 border-brand-500 text-white'
+                          : 'border-surface-200 text-surface-500 hover:border-brand-300',
+                      )}
+                    >
+                      {p === 'instagram' ? '📸 Instagram' : '▶️ YouTube'}
+                    </button>
+                  ))}
                 </div>
               </div>
+
+              {/* Instagram stats */}
+              <div className="bg-white rounded-2xl border border-surface-200 p-6 space-y-4">
+                <div className="flex items-center gap-2">
+                  <span className="text-base">📸</span>
+                  <p className="text-sm font-semibold text-surface-900">Instagram Stats</p>
+                </div>
+                <div className="grid grid-cols-2 gap-4">
+                  <Input label="Followers"           type="number" min="0" placeholder="0"    {...statsForm.register('followers')} />
+                  <Input label="Monthly Reach"       type="number" min="0" placeholder="0"    {...statsForm.register('monthly_reach')} />
+                  <Input label="Avg. Video Views"    type="number" min="0" placeholder="0"    {...statsForm.register('avg_views')} />
+                  <Input label="Engagement Rate (%)" type="number" min="0" max="100" step="0.01" placeholder="0.00" {...statsForm.register('engagement_rate')} />
+                </div>
+              </div>
+
+              {/* YouTube stats */}
+              <div className="bg-white rounded-2xl border border-surface-200 p-6 space-y-4">
+                <div className="flex items-center gap-2">
+                  <span className="text-base">▶️</span>
+                  <p className="text-sm font-semibold text-surface-900">YouTube Stats</p>
+                </div>
+                <div className="grid grid-cols-2 gap-4">
+                  <Input label="Subscribers"         type="number" min="0" placeholder="0"    {...statsForm.register('yt_followers')} />
+                  <Input label="Monthly Views"       type="number" min="0" placeholder="0"    {...statsForm.register('yt_monthly_reach')} />
+                  <Input label="Avg. Video Views"    type="number" min="0" placeholder="0"    {...statsForm.register('yt_avg_views')} />
+                  <Input label="Engagement Rate (%)" type="number" min="0" max="100" step="0.01" placeholder="0.00" {...statsForm.register('yt_engagement_rate')} />
+                </div>
+              </div>
+
               <Button type="submit" loading={statsForm.formState.isSubmitting}>Save Stats</Button>
             </form>
           )
@@ -446,25 +495,83 @@ export function CollaborationsPage() {
             <Skeleton className="h-64 rounded-2xl" />
           ) : (
             <div className="space-y-4">
+              {/* General */}
               <div className="bg-white rounded-2xl border border-surface-200 p-6">
-                <p className="text-sm text-surface-500 mb-4">Select services you offer to brands.</p>
+                <p className="text-xs font-semibold text-surface-400 uppercase tracking-wider mb-3">General</p>
                 <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
-                  {SERVICES.map(svc => (
-                    <button
-                      key={svc.value}
-                      type="button"
-                      onClick={() => toggleService(svc.value)}
+                  {SERVICES.filter(s => !s.platform).map(svc => (
+                    <button key={svc.value} type="button" onClick={() => toggleService(svc.value)}
                       className={cn(
                         'flex items-center gap-2 p-3 rounded-xl border-2 text-left transition-all',
                         services.includes(svc.value) ? 'border-brand-500 bg-brand-50' : 'border-surface-200 hover:border-brand-300',
-                      )}
-                    >
+                      )}>
                       <span className="text-lg">{svc.icon}</span>
                       <span className="text-xs font-medium text-surface-700">{svc.label}</span>
                     </button>
                   ))}
                 </div>
               </div>
+
+              {/* Instagram */}
+              <div className="bg-white rounded-2xl border border-surface-200 p-6">
+                <div className="flex items-center gap-2 mb-3">
+                  <span className="text-base">📸</span>
+                  <p className="text-xs font-semibold text-surface-400 uppercase tracking-wider">Instagram</p>
+                </div>
+                <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+                  {SERVICES.filter(s => s.platform === 'instagram').map(svc => (
+                    <button key={svc.value} type="button" onClick={() => toggleService(svc.value)}
+                      className={cn(
+                        'flex items-center gap-2 p-3 rounded-xl border-2 text-left transition-all',
+                        services.includes(svc.value) ? 'border-pink-500 bg-pink-50' : 'border-surface-200 hover:border-pink-300',
+                      )}>
+                      <span className="text-lg">{svc.icon}</span>
+                      <span className="text-xs font-medium text-surface-700">{svc.label}</span>
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {/* YouTube */}
+              <div className="bg-white rounded-2xl border border-surface-200 p-6">
+                <div className="flex items-center gap-2 mb-3">
+                  <span className="text-base">▶️</span>
+                  <p className="text-xs font-semibold text-surface-400 uppercase tracking-wider">YouTube</p>
+                </div>
+                <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+                  {SERVICES.filter(s => s.platform === 'youtube').map(svc => (
+                    <button key={svc.value} type="button" onClick={() => toggleService(svc.value)}
+                      className={cn(
+                        'flex items-center gap-2 p-3 rounded-xl border-2 text-left transition-all',
+                        services.includes(svc.value) ? 'border-red-500 bg-red-50' : 'border-surface-200 hover:border-red-300',
+                      )}>
+                      <span className="text-lg">{svc.icon}</span>
+                      <span className="text-xs font-medium text-surface-700">{svc.label}</span>
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {/* Both platforms */}
+              <div className="bg-white rounded-2xl border border-surface-200 p-6">
+                <div className="flex items-center gap-2 mb-3">
+                  <span className="text-base">🌐</span>
+                  <p className="text-xs font-semibold text-surface-400 uppercase tracking-wider">Cross-Platform</p>
+                </div>
+                <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+                  {SERVICES.filter(s => s.platform === 'both').map(svc => (
+                    <button key={svc.value} type="button" onClick={() => toggleService(svc.value)}
+                      className={cn(
+                        'flex items-center gap-2 p-3 rounded-xl border-2 text-left transition-all',
+                        services.includes(svc.value) ? 'border-brand-500 bg-brand-50' : 'border-surface-200 hover:border-brand-300',
+                      )}>
+                      <span className="text-lg">{svc.icon}</span>
+                      <span className="text-xs font-medium text-surface-700">{svc.label}</span>
+                    </button>
+                  ))}
+                </div>
+              </div>
+
               <Button onClick={saveServices}>Save Services</Button>
             </div>
           )
@@ -494,11 +601,11 @@ export function CollaborationsPage() {
             <div className="flex-1 space-y-3">
               <div>
                 <label className="block text-sm font-medium text-surface-700 mb-1.5">Content Type</label>
-                <div className="grid grid-cols-3 gap-1.5">
+                <div className="flex flex-wrap gap-1.5">
                   {CONTENT_TYPES.map(ct => (
                     <button key={ct.value} type="button" onClick={() => setContentType(contentType === ct.value ? null : ct.value)}
                       className={cn(
-                        'flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg border text-xs font-medium transition-all',
+                        'flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg border text-xs font-medium transition-all whitespace-nowrap',
                         contentType === ct.value
                           ? 'bg-brand-50 border-brand-300 text-brand-700'
                           : 'border-surface-200 text-surface-600 hover:border-surface-300 hover:bg-surface-50',

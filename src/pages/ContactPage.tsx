@@ -39,7 +39,7 @@ const info = [
   },
   {
     icon: Sparkles,
-    label: 'For brands',
+    label: 'Brands & Agencies',
     value: 'partnerships@showkase.io',
     href: 'mailto:partnerships@showkase.io',
   },

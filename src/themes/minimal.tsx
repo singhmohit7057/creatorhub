@@ -8,7 +8,7 @@ import { Input, Textarea, Select } from '@/components/common/Input'
 import { Button } from '@/components/common/Button'
 import { BUDGET_OPTIONS, CREATOR_CATEGORIES, SERVICES } from '@/utils/constants'
 import { formatNumber, cn } from '@/utils/helpers'
-import { SOCIAL_COLORS, SOCIAL_TEXT, SOCIAL_ICONS, inquirySchema, type InquiryFormData, type ThemeProps, TopBar } from './_shared'
+import { SOCIAL_COLORS, SOCIAL_TEXT, SOCIAL_ICONS, inquirySchema, type InquiryFormData, type ThemeProps, TopBar, isYTStats, getStatRows } from './_shared'
 
 const t = {
   page:        'bg-white text-gray-900',
@@ -114,19 +114,14 @@ export function MinimalTheme({ profile: p, socials, media, stats, collabs, testi
         </div>
 
         {/* Body */}
-        <div className="max-w-5xl mx-auto px-4 pb-20 space-y-14 mt-4">
+        <div className="max-w-5xl mx-auto px-4 pb-6 space-y-14 mt-4">
 
           {/* Stats */}
-          {stats && (stats.followers || stats.monthly_reach || stats.avg_views || stats.engagement_rate) && (
+          {stats && (isYTStats(stats) ? (stats.yt_followers || stats.yt_monthly_reach || stats.yt_avg_views || stats.yt_engagement_rate) : (stats.followers || stats.monthly_reach || stats.avg_views || stats.engagement_rate)) && (
             <section>
               <h2 className={cn('text-xl font-bold mb-6', t.sectionHead)}>By The Numbers</h2>
               <div className="grid grid-cols-2 gap-3">
-                {[
-                  { label: 'Followers',     value: stats.followers,       suffix: '',  icon: '👥' },
-                  { label: 'Monthly Reach', value: stats.monthly_reach,   suffix: '',  icon: '📡' },
-                  { label: 'Avg. Views',    value: stats.avg_views,       suffix: '',  icon: '▶️'  },
-                  { label: 'Engagement',    value: stats.engagement_rate, suffix: '%', icon: '🔥' },
-                ].filter(s => s.value).map(s => (
+                {getStatRows(stats).filter(s => s.value).map(s => (
                   <div key={s.label} className={cn('rounded-2xl border p-4 flex flex-col gap-1', t.card, t.cardBorder)}>
                     <span className="text-lg leading-none">{s.icon}</span>
                     <p className={cn('text-3xl font-extrabold tracking-tight mt-1', t.statValue)}>
@@ -278,7 +273,7 @@ export function MinimalTheme({ profile: p, socials, media, stats, collabs, testi
 
           {/* Footer */}
           <div className={cn('text-center pt-2 border-t', t.divider)}>
-            <Link to="/" className={cn('text-xs hover:text-brand-500 transition-colors', t.muted)}>Powered by Showkase →</Link>
+            <Link to="/" className={cn('text-xs hover:text-brand-500 transition-colors', t.muted)}>Made with Showkase — Create yours free →</Link>
           </div>
         </div>
       </div>
